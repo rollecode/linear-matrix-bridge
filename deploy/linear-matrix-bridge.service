@@ -1,0 +1,35 @@
+[Unit]
+Description=linear-matrix-bridge: Linear issues to Matrix threads
+After=network-online.target matrix-synapse.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rolle
+Group=rolle
+WorkingDirectory=/opt/linear-matrix-bridge
+
+# node:sqlite needs Node 22.5 or newer, so the nvm build is pinned rather than
+# /usr/bin/node. Update this path if the nvm version changes.
+ExecStart=/home/rolle/.nvm/versions/node/v22.20.0/bin/node dist/server/index.js
+
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=5055
+Environment=DATABASE_PATH=/opt/linear-matrix-bridge/data/bridge.db
+Environment=MIGRATIONS_DIR=/opt/linear-matrix-bridge/migrations
+
+# Tokens live here, mode 600, never in the unit and never in git.
+EnvironmentFile=/opt/linear-matrix-bridge/.env
+
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/opt/linear-matrix-bridge/data
+
+[Install]
+WantedBy=multi-user.target

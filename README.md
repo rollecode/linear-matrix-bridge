@@ -6,7 +6,7 @@
 <img style="justify-content:center;text-align: center;width: 180px; height: auto;"  width="1600" height="400" alt="Linear" src="https://github.com/user-attachments/assets/8c2d5756-0e3f-432a-8a3d-1d0e8293539a" /> &nbsp; <img style="justify-content:center;text-align: center;width: 100px; height: auto;" width="1920" height="820" alt="Matrix" src="https://github.com/user-attachments/assets/8685c940-eb6d-4417-8300-6979c0ce3821" />
 
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
+![Version](https://img.shields.io/badge/version-0.2.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
 
 </div>
 </center>
@@ -31,6 +31,13 @@ A Matrix thread and a Linear issue become one conversation. Replies in the threa
 | --- | --- |
 | A comment on a mapped issue | Posted into the thread, with the Linear author's name. |
 | An issue state change | A one-line note in the thread. State changes only, not every field update. |
+
+## Where it runs
+
+Two deployments, one codebase. The Worker's `fetch` handler is the entry point in both, so routing, token checks and loop prevention cannot drift apart.
+
+- **Cloudflare Worker with D1.** Matrix application services are push-based and Linear webhooks are plain HTTP, so both directions are stateless request handling with no long-lived `/sync` connection and nothing to patch.
+- **A plain Node server with SQLite**, for putting the bridge on the same box as Synapse. `src/server/` adapts Node's HTTP server to `Request`/`Response` and puts a D1-shaped interface over `node:sqlite`. Needs Node 22.5 or newer.
 
 ## Setup
 
@@ -93,6 +100,45 @@ For `LINEAR_TOKEN` there are two options:
 
 - **OAuth application with `actor=app`** (preferred). Comments and issues are attributed to the bridge itself, and the Matrix sender's name rides along in Linear's `createAsUser` field, so each comment shows the person who actually wrote it. Set `LINEAR_AUTH_MODE` to `oauth` and use the access token.
 - **Personal API key** as a fallback. Set `LINEAR_AUTH_MODE` to `api_key`. Linear then attributes **every bridged comment and issue to the person who owns that key**, and the Matrix sender's name is written into the comment body instead.
+
+## Running on your own server instead
+
+Same code, no Cloudflare account. `deploy/` holds a systemd unit and an nginx vhost to copy.
+
+```sh
+git clone git@github.com:rollecode/linear-matrix-bridge.git /opt/linear-matrix-bridge
+cd /opt/linear-matrix-bridge
+npm ci
+npm run build
+mkdir -p data
+```
+
+Configuration comes from the environment rather than `wrangler.jsonc`. Put the four secrets and the vars in `/opt/linear-matrix-bridge/.env`, mode 600:
+
+```sh
+MATRIX_HOMESERVER_URL=https://matrix.example.org
+MATRIX_BOT_USER_ID=@linear:example.org
+MATRIX_ALLOWED_ROOMS=
+LINEAR_TEAM_ID=
+LINEAR_AUTH_MODE=api_key
+MATRIX_AS_TOKEN=
+MATRIX_HS_TOKEN=
+LINEAR_TOKEN=
+LINEAR_WEBHOOK_SECRET=
+```
+
+Then install the unit and start it:
+
+```sh
+sudo cp deploy/linear-matrix-bridge.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now linear-matrix-bridge
+curl -s http://127.0.0.1:5055/health
+```
+
+Migrations apply themselves at startup, tracked in a `d1_migrations` table, so there is no separate migrate step. The dedupe prune runs on a daily timer in place of the Worker's cron trigger.
+
+The bridge binds to localhost. Synapse reaches it there, so the only thing that has to be public is the Linear webhook path, which is all `deploy/nginx.conf.example` exposes.
 
 ## Loop prevention
 

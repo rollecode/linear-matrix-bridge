@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 0.2.0 - 30.8.2026
+
+- Node server deployment with SQLite, alongside the Worker
+- systemd unit and nginx vhost in `deploy/`
+- Migrations apply at startup
+
 ## 0.1.0 - 30.8.2026
 
 - Two-way bridge between Linear issues and Matrix threads
