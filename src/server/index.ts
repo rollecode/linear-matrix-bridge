@@ -5,6 +5,7 @@ import worker from "../index.js";
 import type { Env, LinearAuthMode } from "../env.js";
 import type { BridgeExecutionContext } from "../runtime.js";
 import { SqliteD1 } from "./sqlite.js";
+import { startBot } from "./bot.js";
 
 /**
  * Runs the same Worker on a plain Node server. The fetch handler is reused
@@ -44,6 +45,9 @@ function buildEnv(db: SqliteD1): Env {
     LINEAR_AUTH_MODE: (process.env.LINEAR_AUTH_MODE ?? "api_key") as LinearAuthMode,
     LINEAR_API_URL: process.env.LINEAR_API_URL,
     MATRIX_AS_TOKEN: required("MATRIX_AS_TOKEN"),
+    MATRIX_BOT_ACCESS_TOKEN: required("MATRIX_BOT_ACCESS_TOKEN"),
+    BOT_STORAGE_PATH: process.env.BOT_STORAGE_PATH,
+    CRYPTO_STORAGE_PATH: process.env.CRYPTO_STORAGE_PATH,
     MATRIX_HS_TOKEN: required("MATRIX_HS_TOKEN"),
     LINEAR_TOKEN: required("LINEAR_TOKEN"),
     LINEAR_WEBHOOK_SECRET: required("LINEAR_WEBHOOK_SECRET"),
@@ -133,6 +137,10 @@ const host = process.env.HOST ?? DEFAULT_HOST;
 server.listen(port, host, () => {
   console.log(`linear-matrix-bridge listening on http://${host}:${port}`);
 });
+
+// Matrix arrives over sync, not over the appservice endpoints, so the bridge can
+// decrypt. The HTTP server here is only Linear's webhook and the health check.
+env.gateway = await startBot(env);
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {

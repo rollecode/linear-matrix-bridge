@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 0.5.0 - 30.8.2026
+
+- Read and write end-to-end encrypted rooms on the server deployment
+- Matrix arrives over sync as a real user, not over appservice transactions
+
 ## 0.4.0 - 30.8.2026
 
 - Warn on joining an encrypted room instead of ignoring it silently

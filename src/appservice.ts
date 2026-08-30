@@ -17,19 +17,23 @@ import {
 import { isRoomAllowed, type Env } from "./env.js";
 import { LinearClient } from "./linear.js";
 import { htmlToMarkdown, stripReplyFallback } from "./markdown.js";
-import { MatrixClient, type MatrixEvent, type MatrixRelatesTo } from "./matrix.js";
+import { HttpMatrixClient, type MatrixEvent, type MatrixGateway, type MatrixRelatesTo } from "./matrix.js";
 
 const TEXT_MSGTYPES = new Set(["m.text", "m.notice", "m.emote"]);
 const LINK_SUBCOMMAND = "link";
 
 interface Bridge {
   env: Env;
-  matrix: MatrixClient;
+  matrix: MatrixGateway;
   linear: LinearClient;
 }
 
-export async function handleTransaction(env: Env, events: MatrixEvent[]): Promise<void> {
-  const bridge: Bridge = { env, matrix: new MatrixClient(env), linear: new LinearClient(env) };
+export async function handleTransaction(
+  env: Env,
+  events: MatrixEvent[],
+  matrix: MatrixGateway = new HttpMatrixClient(env),
+): Promise<void> {
+  const bridge: Bridge = { env, matrix, linear: new LinearClient(env) };
 
   if (events.length > MAX_EVENTS_PER_TRANSACTION) {
     console.warn(
@@ -80,7 +84,7 @@ async function acceptInvite(bridge: Bridge, event: MatrixEvent): Promise<void> {
 
   await bridge.matrix.joinRoom(event.room_id);
 
-  if (await bridge.matrix.isRoomEncrypted(event.room_id)) {
+  if (!bridge.matrix.supportsEncryption && (await bridge.matrix.isRoomEncrypted(event.room_id))) {
     const eventId = await bridge.matrix.sendNotice(
       event.room_id,
       "This room is end-to-end encrypted, and the bridge cannot read encrypted messages, so `!linear` will do nothing here. Use it in an unencrypted room.",

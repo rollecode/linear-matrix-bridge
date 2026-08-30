@@ -29,7 +29,54 @@ export interface MatrixMessageContent {
 
 export class MatrixError extends Error {}
 
-export class MatrixClient {
+/** What the bridge needs from Matrix, so the transport can differ per deployment. */
+export interface MatrixGateway {
+  /** False for transports with no device and therefore no megolm keys. */
+  readonly supportsEncryption: boolean;
+  getEvent(roomId: string, eventId: string): Promise<MatrixEvent>;
+  getDisplayName(userId: string): Promise<string>;
+  sendThreadMessage(roomId: string, threadRootEventId: string, latestEventId: string, markdown: string): Promise<string>;
+  joinRoom(roomId: string): Promise<void>;
+  isRoomEncrypted(roomId: string): Promise<boolean>;
+  sendNotice(roomId: string, markdown: string): Promise<string>;
+}
+
+/**
+ * Built once here so every transport sends an identical relation. MSC3440 wants
+ * the reply fallback aimed at the newest event in the thread, not the root.
+ */
+export function threadedContent(
+  threadRootEventId: string,
+  latestEventId: string,
+  markdown: string,
+  msgtype = "m.text",
+): MatrixMessageContent {
+  return {
+    msgtype,
+    body: markdown,
+    format: HTML_FORMAT,
+    formatted_body: markdownToHtml(markdown),
+    "m.relates_to": {
+      rel_type: THREAD_REL_TYPE,
+      event_id: threadRootEventId,
+      is_falling_back: true,
+      "m.in_reply_to": { event_id: latestEventId },
+    },
+  };
+}
+
+export function noticeContent(markdown: string): MatrixMessageContent {
+  return {
+    msgtype: "m.notice",
+    body: markdown,
+    format: HTML_FORMAT,
+    formatted_body: markdownToHtml(markdown),
+  };
+}
+
+export class HttpMatrixClient implements MatrixGateway {
+  readonly supportsEncryption = false;
+
   private readonly baseUrl: string;
   private readonly accessToken: string;
   private readonly displayNames = new Map<string, string>();
@@ -67,11 +114,6 @@ export class MatrixClient {
     await this.request("POST", `/_matrix/client/v3/join/${encodeURIComponent(roomId)}`, {});
   }
 
-  /**
-   * The bridge has no megolm implementation, so in an encrypted room every
-   * message arrives as ciphertext it cannot read. Worth knowing on join rather
-   * than discovering through silence.
-   */
   async isRoomEncrypted(roomId: string): Promise<boolean> {
     try {
       await this.request("GET", `/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/state/m.room.encryption`);
@@ -82,12 +124,7 @@ export class MatrixClient {
   }
 
   async sendNotice(roomId: string, markdown: string): Promise<string> {
-    const content: MatrixMessageContent = {
-      msgtype: "m.notice",
-      body: markdown,
-      format: HTML_FORMAT,
-      formatted_body: markdownToHtml(markdown),
-    };
+    const content = noticeContent(markdown);
 
     const path = `/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/${MESSAGE_EVENT_TYPE}/${crypto.randomUUID()}`;
     const sent = await this.request<{ event_id: string }>("PUT", path, content);
@@ -129,18 +166,7 @@ export class MatrixClient {
     latestEventId: string,
     markdown: string,
   ): Promise<string> {
-    const content: MatrixMessageContent = {
-      msgtype: "m.text",
-      body: markdown,
-      format: HTML_FORMAT,
-      formatted_body: markdownToHtml(markdown),
-      "m.relates_to": {
-        rel_type: THREAD_REL_TYPE,
-        event_id: threadRootEventId,
-        is_falling_back: true,
-        "m.in_reply_to": { event_id: latestEventId },
-      },
-    };
+    const content = threadedContent(threadRootEventId, latestEventId, markdown);
 
     const path = `/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/${MESSAGE_EVENT_TYPE}/${crypto.randomUUID()}`;
     const sent = await this.request<{ event_id: string }>("PUT", path, content);

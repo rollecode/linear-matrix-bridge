@@ -107,7 +107,7 @@ async function handleTransactionRequest(
     .catch(() => ({ events: [] as MatrixEvent[] }));
 
   try {
-    await handleTransaction(env, body.events ?? []);
+    await handleTransaction(env, body.events ?? [], env.gateway);
   } catch (error) {
     ctx.waitUntil(releaseTransaction(env.DB, txnId));
     console.error(`Transaction ${txnId} failed`, error);
@@ -138,7 +138,7 @@ async function handleLinearRequest(request: Request, env: Env): Promise<Response
     return json({ error: "Stale webhook" }, HTTP_FORBIDDEN);
   }
 
-  await handleWebhook(env, payload);
+  await handleWebhook(env, payload, env.gateway);
 
   return json({ ok: true });
 }

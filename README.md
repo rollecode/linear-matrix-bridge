@@ -6,7 +6,7 @@
 <img style="justify-content:center;text-align: center;width: 180px; height: auto;"  width="1600" height="400" alt="Linear" src="https://github.com/user-attachments/assets/8c2d5756-0e3f-432a-8a3d-1d0e8293539a" /> &nbsp; <img style="justify-content:center;text-align: center;width: 100px; height: auto;" width="1920" height="820" alt="Matrix" src="https://github.com/user-attachments/assets/8685c940-eb6d-4417-8300-6979c0ce3821" />
 
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
+![Version](https://img.shields.io/badge/version-0.5.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
 
 </div>
 </center>
@@ -37,7 +37,7 @@ A Matrix thread and a Linear issue become one conversation. Replies in the threa
 Two deployments, one codebase. The Worker's `fetch` handler is the entry point in both, so routing, token checks and loop prevention cannot drift apart.
 
 - **Cloudflare Worker with D1.** Matrix application services are push-based and Linear webhooks are plain HTTP, so both directions are stateless request handling with no long-lived `/sync` connection and nothing to patch.
-- **A plain Node server with SQLite**, for putting the bridge on the same box as Synapse. `src/server/` adapts Node's HTTP server to `Request`/`Response` and puts a D1-shaped interface over `node:sqlite`. Needs Node 22.5 or newer.
+- **A plain Node server with SQLite**, for putting the bridge on the same box as Synapse. `src/server/` adapts Node's HTTP server to `Request`/`Response` and puts a D1-shaped interface over `node:sqlite`. Here Matrix arrives over `/sync` as an ordinary user with a device, which is what makes **end-to-end encrypted rooms work**. Needs Node 24 or newer for the Rust crypto SDK.
 
 ## Setup
 
@@ -123,6 +123,7 @@ LINEAR_TEAM_ID=
 LINEAR_AUTH_MODE=api_key
 MATRIX_AS_TOKEN=
 MATRIX_HS_TOKEN=
+MATRIX_BOT_ACCESS_TOKEN=
 LINEAR_TOKEN=
 LINEAR_WEBHOOK_SECRET=
 ```
@@ -160,7 +161,7 @@ This is where naive bridges break, so all four cases are handled in D1 rather th
 
 Deliberate omissions, not oversights:
 
-- **End-to-end encrypted rooms.** The bridge has no megolm implementation, so every message in an encrypted room arrives as ciphertext it cannot read and `!linear` does nothing. It says so on joining such a room rather than failing silently. Supporting E2EE needs MSC3202 enabled on the homeserver plus a crypto store, which rules out the Worker deployment.
+- **End-to-end encrypted rooms on the Worker deployment.** An application service has no device and therefore no megolm keys, so it cannot decrypt. It says so on joining such a room rather than failing silently. The server deployment runs as a real user with a device and handles encrypted rooms.
 
 - **Message edits** (`m.replace`) are ignored. Bridging them would post a duplicate comment.
 - **Redactions** are ignored. Deleting the matching Linear comment on the strength of a Matrix redaction is not a trade the bridge makes on its own.

@@ -2,7 +2,7 @@ import { WEBHOOK_MAX_CLOCK_SKEW_MS } from "./constants.js";
 import { findLinkByIssue, isSentComment, recordSentEvent, setLastEvent } from "./db.js";
 import type { Env } from "./env.js";
 import { hmacSha256Hex, timingSafeEqual } from "./crypto.js";
-import { MatrixClient } from "./matrix.js";
+import { HttpMatrixClient, type MatrixGateway } from "./matrix.js";
 
 export const LINEAR_SIGNATURE_HEADER = "Linear-Signature";
 
@@ -49,18 +49,22 @@ export function isTimestampFresh(payload: LinearWebhookPayload, now: number = Da
   return Math.abs(now - payload.webhookTimestamp) <= WEBHOOK_MAX_CLOCK_SKEW_MS;
 }
 
-export async function handleWebhook(env: Env, payload: LinearWebhookPayload): Promise<void> {
+export async function handleWebhook(
+  env: Env,
+  payload: LinearWebhookPayload,
+  matrix: MatrixGateway = new HttpMatrixClient(env),
+): Promise<void> {
   if (payload.type === "Comment" && payload.action === "create") {
-    await handleCommentCreated(env, payload);
+    await handleCommentCreated(env, payload, matrix);
     return;
   }
 
   if (payload.type === "Issue" && payload.action === "update") {
-    await handleIssueStateChange(env, payload);
+    await handleIssueStateChange(env, payload, matrix);
   }
 }
 
-async function handleCommentCreated(env: Env, payload: LinearWebhookPayload): Promise<void> {
+async function handleCommentCreated(env: Env, payload: LinearWebhookPayload, matrix: MatrixGateway): Promise<void> {
   const comment = payload.data as unknown as CommentData;
 
   if (!comment.issueId || !comment.body) {
@@ -78,10 +82,10 @@ async function handleCommentCreated(env: Env, payload: LinearWebhookPayload): Pr
   }
 
   const author = comment.user?.name ?? payload.actor?.name ?? "Linear";
-  await postToThread(env, link.matrix_room_id, link.thread_root_event_id, link.last_event_id, `**${author}** on ${link.linear_issue_identifier}:\n\n${comment.body}`);
+  await postToThread(env, matrix, link.matrix_room_id, link.thread_root_event_id, link.last_event_id, `**${author}** on ${link.linear_issue_identifier}:\n\n${comment.body}`);
 }
 
-async function handleIssueStateChange(env: Env, payload: LinearWebhookPayload): Promise<void> {
+async function handleIssueStateChange(env: Env, payload: LinearWebhookPayload, matrix: MatrixGateway): Promise<void> {
   if (!("stateId" in (payload.updatedFrom ?? {}))) {
     return;
   }
@@ -99,6 +103,7 @@ async function handleIssueStateChange(env: Env, payload: LinearWebhookPayload): 
 
   await postToThread(
     env,
+    matrix,
     link.matrix_room_id,
     link.thread_root_event_id,
     link.last_event_id,
@@ -108,12 +113,12 @@ async function handleIssueStateChange(env: Env, payload: LinearWebhookPayload): 
 
 async function postToThread(
   env: Env,
+  matrix: MatrixGateway,
   roomId: string,
   threadRootEventId: string,
   lastEventId: string | null,
   markdown: string,
 ): Promise<void> {
-  const matrix = new MatrixClient(env);
   const eventId = await matrix.sendThreadMessage(roomId, threadRootEventId, lastEventId ?? threadRootEventId, markdown);
 
   await recordSentEvent(env.DB, eventId);

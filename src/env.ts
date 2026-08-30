@@ -1,9 +1,15 @@
 import type { BridgeDatabase } from "./runtime.js";
+import type { MatrixGateway } from "./matrix.js";
 
 export type LinearAuthMode = "api_key" | "oauth";
 
 export interface Env {
   DB: BridgeDatabase;
+  /**
+   * Live Matrix transport, injected by the server entrypoint. Absent on
+   * Workers, where the appservice HTTP client is the only option.
+   */
+  gateway?: MatrixGateway;
 
   MATRIX_HOMESERVER_URL: string;
   /** Full MXID of the bridge's own user, built from `sender_localpart` in registration.yaml. */
@@ -17,6 +23,10 @@ export interface Env {
   LINEAR_API_URL?: string;
 
   MATRIX_AS_TOKEN: string;
+  /** Device access token for the bot user. Server deployment only; must stay stable or the crypto store is invalidated. */
+  MATRIX_BOT_ACCESS_TOKEN: string;
+  BOT_STORAGE_PATH?: string;
+  CRYPTO_STORAGE_PATH?: string;
   MATRIX_HS_TOKEN: string;
   LINEAR_TOKEN: string;
   LINEAR_WEBHOOK_SECRET: string;
