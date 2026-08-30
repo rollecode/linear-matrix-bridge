@@ -1,12 +1,9 @@
 <center align="center" style="text-align: center;justify-content:center;">
 <div align="center" style="text-align: center;justify-content:center;">
-<h1 align="center" style="text-align: center;justify-content:center;">
 
-Linear to Matrix bridge
+<h1>Linear to Matrix bridge</h1>
 
-<img style="justify-content:center;text-align: center;width: 95px; height: auto;" alt="image" src="public/linear-logo.png" />
-
-</h1>
+<img style="justify-content:center;text-align: center;width: 180px; height: auto;"  width="1600" height="400" alt="Linear" src="https://github.com/user-attachments/assets/8c2d5756-0e3f-432a-8a3d-1d0e8293539a" /> &nbsp; <img style="justify-content:center;text-align: center;width: 100px; height: auto;" width="1920" height="820" alt="Matrix" src="https://github.com/user-attachments/assets/8685c940-eb6d-4417-8300-6979c0ce3821" />
 
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
