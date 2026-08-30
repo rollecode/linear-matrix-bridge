@@ -1,6 +1,6 @@
 {
   "name": "linear-matrix-bridge",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "license": "MIT",
   "description": "Two-way bridge between Linear issues and Matrix threads, running on a Cloudflare Worker",

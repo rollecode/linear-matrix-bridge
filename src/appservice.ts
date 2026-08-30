@@ -29,8 +29,15 @@ export async function handleTransaction(env: Env, events: MatrixEvent[]): Promis
     );
   }
 
+  // One bad event must not fail the transaction. Synapse retries a failed
+  // transaction under the same ID forever, so throwing here would wedge the
+  // queue behind a message that will never succeed.
   for (const event of events.slice(0, MAX_EVENTS_PER_TRANSACTION)) {
-    await handleEvent(bridge, event);
+    try {
+      await handleEvent(bridge, event);
+    } catch (error) {
+      console.error(`Dropping event ${event.event_id} in ${event.room_id}`, error);
+    }
   }
 }
 

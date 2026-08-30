@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## 0.2.1 - 30.8.2026
+
+- One failing event no longer wedges the appservice queue
+
 ## 0.2.0 - 30.8.2026
 
 - Node server deployment with SQLite, alongside the Worker

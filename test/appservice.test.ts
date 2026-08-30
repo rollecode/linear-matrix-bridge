@@ -150,6 +150,39 @@ describe("Matrix appservice transactions", () => {
     expect(link).not.toBeNull();
   });
 
+  it("keeps processing after one event fails, so the queue cannot wedge", async () => {
+    await seedLink();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // The first message's Linear call blows up; the second must still land.
+    let call = 0;
+    const inner = globalThis.fetch as unknown as typeof fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        if (url.includes("api.linear.app") && call++ === 0) {
+          throw new Error("Linear is down");
+        }
+        return inner(input, init);
+      }),
+    );
+
+    const response = await SELF.fetch(
+      transactionRequest("txn-partial", [
+        threadedMessage("$bad", "first"),
+        threadedMessage("$good", "second"),
+      ]),
+    );
+
+    expect(response.status).toBe(200);
+    const comments = fetchStub.linearCalls.filter((c) =>
+      String((c.body as { query: string }).query).includes("commentCreate"),
+    );
+    expect(comments).toHaveLength(1);
+    expect((comments[0]!.body as { variables: { input: { body: string } } }).variables.input.body).toContain("second");
+  });
+
   it("links an existing issue to the current thread", async () => {
     const command = {
       type: "m.room.message",
