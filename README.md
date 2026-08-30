@@ -6,7 +6,7 @@
 <img style="justify-content:center;text-align: center;width: 180px; height: auto;"  width="1600" height="400" alt="Linear" src="https://github.com/user-attachments/assets/8c2d5756-0e3f-432a-8a3d-1d0e8293539a" /> &nbsp; <img style="justify-content:center;text-align: center;width: 100px; height: auto;" width="1920" height="820" alt="Matrix" src="https://github.com/user-attachments/assets/8685c940-eb6d-4417-8300-6979c0ce3821" />
 
 
-![Version](https://img.shields.io/badge/version-0.3.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
+![Version](https://img.shields.io/badge/version-0.4.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
 
 </div>
 </center>
@@ -25,7 +25,7 @@ A Matrix thread and a Linear issue become one conversation. Replies in the threa
 | `!linear` as a reply to a message | Uses the replied-to message as the description and as the thread anchor. Without a title, the first line of that message becomes the title. |
 | `!linear link MEM-42` | Maps the current thread to an issue that already exists. |
 | Any message in a mapped thread | Becomes a comment on the issue, nested under the first one so the Matrix thread stays one Linear comment thread. |
-| Being invited to a room | The bot joins, as long as the room passes `MATRIX_ALLOWED_ROOMS`. |
+| Being invited to a room | The bot joins, as long as the room passes `MATRIX_ALLOWED_ROOMS`. In an encrypted room it says it cannot read anything there. |
 
 | In Linear | What happens |
 | --- | --- |
@@ -159,6 +159,8 @@ This is where naive bridges break, so all four cases are handled in D1 rather th
 ## Not supported
 
 Deliberate omissions, not oversights:
+
+- **End-to-end encrypted rooms.** The bridge has no megolm implementation, so every message in an encrypted room arrives as ciphertext it cannot read and `!linear` does nothing. It says so on joining such a room rather than failing silently. Supporting E2EE needs MSC3202 enabled on the homeserver plus a crypto store, which rules out the Worker deployment.
 
 - **Message edits** (`m.replace`) are ignored. Bridging them would post a duplicate comment.
 - **Redactions** are ignored. Deleting the matching Linear comment on the strength of a Matrix redaction is not a trade the bridge makes on its own.

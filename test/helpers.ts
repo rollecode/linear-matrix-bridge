@@ -23,6 +23,8 @@ export interface FetchStub {
   linearCalls: RecordedRequest[];
   /** What `GET /event/{eventId}` resolves to, for the reply-to-a-message flow. */
   quotedEvent: unknown;
+  /** Whether the room reports m.room.encryption state. */
+  roomEncrypted: boolean;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface FetchStub {
  * Matrix sends resolve to a fixed event ID; Linear mutations resolve to canned data.
  */
 export function stubFetch(): FetchStub {
-  const stub: FetchStub = { requests: [], matrixSends: [], linearCalls: [], quotedEvent: null };
+  const stub: FetchStub = { requests: [], matrixSends: [], linearCalls: [], quotedEvent: null, roomEncrypted: false };
 
   vi.stubGlobal(
     "fetch",
@@ -45,6 +47,12 @@ export function stubFetch(): FetchStub {
       if (url.includes("/_matrix/client/v3/rooms/") && url.includes("/send/")) {
         stub.matrixSends.push(recorded);
         return Response.json({ event_id: SENT_EVENT_ID });
+      }
+
+      if (url.includes("/state/m.room.encryption")) {
+        return stub.roomEncrypted
+          ? Response.json({ algorithm: "m.megolm.v1.aes-sha2" })
+          : Response.json({ errcode: "M_NOT_FOUND" }, { status: 404 });
       }
 
       if (url.includes("/_matrix/client/v3/rooms/") && url.includes("/event/")) {

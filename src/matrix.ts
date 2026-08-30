@@ -67,6 +67,34 @@ export class MatrixClient {
     await this.request("POST", `/_matrix/client/v3/join/${encodeURIComponent(roomId)}`, {});
   }
 
+  /**
+   * The bridge has no megolm implementation, so in an encrypted room every
+   * message arrives as ciphertext it cannot read. Worth knowing on join rather
+   * than discovering through silence.
+   */
+  async isRoomEncrypted(roomId: string): Promise<boolean> {
+    try {
+      await this.request("GET", `/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/state/m.room.encryption`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async sendNotice(roomId: string, markdown: string): Promise<string> {
+    const content: MatrixMessageContent = {
+      msgtype: "m.notice",
+      body: markdown,
+      format: HTML_FORMAT,
+      formatted_body: markdownToHtml(markdown),
+    };
+
+    const path = `/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/${MESSAGE_EVENT_TYPE}/${crypto.randomUUID()}`;
+    const sent = await this.request<{ event_id: string }>("PUT", path, content);
+
+    return sent.event_id;
+  }
+
   /** Falls back to the localpart, which is better in a Linear comment than an empty string. */
   async getDisplayName(userId: string): Promise<string> {
     const cached = this.displayNames.get(userId);

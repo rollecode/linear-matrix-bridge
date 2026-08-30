@@ -94,6 +94,43 @@ describe("Matrix appservice transactions", () => {
     expect(decodeURIComponent(joins[0]!.url)).toContain(ROOM_ID);
   });
 
+  it("warns on joining an encrypted room, where it can read nothing", async () => {
+    fetchStub.roomEncrypted = true;
+
+    await SELF.fetch(
+      transactionRequest("txn-encrypted", [
+        {
+          type: "m.room.member",
+          event_id: "$invite-enc",
+          room_id: ROOM_ID,
+          sender: "@someone:matrix.test",
+          state_key: testEnv.MATRIX_BOT_USER_ID,
+          content: { membership: "invite" },
+        },
+      ]),
+    );
+
+    expect(fetchStub.matrixSends).toHaveLength(1);
+    expect((fetchStub.matrixSends[0]!.body as { body: string }).body).toContain("end-to-end encrypted");
+  });
+
+  it("stays quiet when joining an unencrypted room", async () => {
+    await SELF.fetch(
+      transactionRequest("txn-plain", [
+        {
+          type: "m.room.member",
+          event_id: "$invite-plain",
+          room_id: ROOM_ID,
+          sender: "@someone:matrix.test",
+          state_key: testEnv.MATRIX_BOT_USER_ID,
+          content: { membership: "invite" },
+        },
+      ]),
+    );
+
+    expect(fetchStub.matrixSends).toHaveLength(0);
+  });
+
   it("ignores messages in threads that are not mapped", async () => {
     await SELF.fetch(transactionRequest("txn-unmapped", [threadedMessage("$msg-3", "Chatter")]));
 

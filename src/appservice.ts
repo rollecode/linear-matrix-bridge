@@ -79,6 +79,14 @@ async function acceptInvite(bridge: Bridge, event: MatrixEvent): Promise<void> {
   }
 
   await bridge.matrix.joinRoom(event.room_id);
+
+  if (await bridge.matrix.isRoomEncrypted(event.room_id)) {
+    const eventId = await bridge.matrix.sendNotice(
+      event.room_id,
+      "This room is end-to-end encrypted, and the bridge cannot read encrypted messages, so `!linear` will do nothing here. Use it in an unencrypted room.",
+    );
+    await recordSentEvent(bridge.env.DB, eventId);
+  }
 }
 
 async function handleMessage(bridge: Bridge, event: MatrixEvent): Promise<void> {

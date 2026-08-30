@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## 0.4.0 - 30.8.2026
+
+- Warn on joining an encrypted room instead of ignoring it silently
+
 ## 0.3.0 - 30.8.2026
 
 - Matrix thread maps to one Linear comment thread, not separate comments
