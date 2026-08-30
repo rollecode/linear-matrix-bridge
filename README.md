@@ -117,7 +117,3 @@ npm test           # vitest, against the real workerd runtime
 npm run typecheck
 npm run dev
 ```
-
-## Licence
-
-MIT.
