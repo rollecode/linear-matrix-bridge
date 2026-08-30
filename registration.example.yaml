@@ -1,0 +1,31 @@
+# Synapse application service registration for linear-matrix-bridge.
+#
+# 1. Generate two different random tokens:
+#      openssl rand -hex 32   # as_token
+#      openssl rand -hex 32   # hs_token
+# 2. Fill them in below and put the same values into the Worker's secrets.
+# 3. Copy this file to the homeserver, list it in homeserver.yaml, restart Synapse.
+
+id: linear-matrix-bridge
+
+# The deployed Worker, with no trailing slash.
+url: https://linear-matrix-bridge.example.workers.dev
+
+# Used by the bridge to talk to the homeserver. Same value as the MATRIX_AS_TOKEN secret.
+as_token: REPLACE_WITH_AS_TOKEN
+
+# Used by the homeserver to talk to the bridge. Same value as the MATRIX_HS_TOKEN secret.
+hs_token: REPLACE_WITH_HS_TOKEN
+
+# The bridge posts as @linear:your.server. Set MATRIX_BOT_USER_ID to that full MXID.
+sender_localpart: linear
+
+# The bridge only ever acts as its own user, so it claims a single-user namespace.
+namespaces:
+  users:
+    - exclusive: true
+      regex: '@linear:example\.org'
+  aliases: []
+  rooms: []
+
+rate_limited: false

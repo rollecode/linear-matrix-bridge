@@ -1,0 +1,123 @@
+# linear-matrix-bridge
+
+A Matrix thread and a Linear issue become one conversation. Replies in the thread turn into comments on the issue, comments on the issue appear in the thread. It is not a notification feed: the point is that the discussion happens once, in whichever tool the person is already in.
+
+Linear integrates with Slack and Discord but not Matrix, and matrix-hookshot bridges GitHub, GitLab, JIRA and OpenProject but not Linear. This fills that gap.
+
+Runs as a Cloudflare Worker with a D1 database. Matrix application services are push-based and Linear webhooks are plain HTTP, so both directions are stateless request handling with no long-lived `/sync` connection and no process to patch.
+
+## How it behaves
+
+| In Matrix | What happens |
+| --- | --- |
+| `!linear Fix the login bug` | Creates an issue in the configured team. The bot replies in a thread with the identifier and URL, and that thread is now mapped to the issue. |
+| `!linear` as a reply to a message | Uses the replied-to message as the description and as the thread anchor. Without a title, the first line of that message becomes the title. |
+| `!linear link MEM-42` | Maps the current thread to an issue that already exists. |
+| Any message in a mapped thread | Becomes a comment on the issue. |
+| Being invited to a room | The bot joins, as long as the room passes `MATRIX_ALLOWED_ROOMS`. |
+
+| In Linear | What happens |
+| --- | --- |
+| A comment on a mapped issue | Posted into the thread, with the Linear author's name. |
+| An issue state change | A one-line note in the thread. State changes only, not every field update. |
+
+## Setup
+
+### 1. Cloudflare
+
+```sh
+npm install
+npx wrangler d1 create linear-matrix-bridge
+```
+
+Put the returned `database_id` into `wrangler.jsonc`, then apply the schema and deploy:
+
+```sh
+npm run migrate:remote
+npm run deploy
+```
+
+Set the non-secret values in the `vars` block of `wrangler.jsonc`:
+
+| Var | Meaning |
+| --- | --- |
+| `MATRIX_HOMESERVER_URL` | Base URL of the homeserver, no trailing slash. |
+| `MATRIX_BOT_USER_ID` | Full MXID built from `sender_localpart`, for example `@linear:example.org`. |
+| `MATRIX_ALLOWED_ROOMS` | Comma-separated room IDs the bridge acts in. Empty means every room it is invited to. |
+| `LINEAR_TEAM_ID` | UUID of the team that `!linear <title>` creates issues in. |
+| `LINEAR_AUTH_MODE` | `oauth` or `api_key`. See below. |
+| `COMMAND_PREFIX` | Defaults to `!linear`. |
+
+Then the four secrets, which never belong in `wrangler.jsonc`:
+
+```sh
+npx wrangler secret put MATRIX_AS_TOKEN
+npx wrangler secret put MATRIX_HS_TOKEN
+npx wrangler secret put LINEAR_TOKEN
+npx wrangler secret put LINEAR_WEBHOOK_SECRET
+```
+
+### 2. Matrix
+
+Copy `registration.example.yaml` to the homeserver as `linear-matrix-bridge.yaml`, fill in the URL and the two tokens, and reference it from `homeserver.yaml`:
+
+```yaml
+app_service_config_files:
+  - /etc/matrix-synapse/linear-matrix-bridge.yaml
+```
+
+**Synapse only loads registration files at startup, so it has to be restarted** before the bridge exists:
+
+```sh
+sudo systemctl restart matrix-synapse
+```
+
+Then invite `@linear:example.org` to the room. It accepts the invite by itself.
+
+### 3. Linear
+
+Create the webhook in Linear's API settings pointing at `https://<your-worker>/linear/webhook`, subscribed to **Issues** and **Issue comments**. Copy its signing secret into `LINEAR_WEBHOOK_SECRET`.
+
+For `LINEAR_TOKEN` there are two options:
+
+- **OAuth application with `actor=app`** (preferred). Comments and issues are attributed to the bridge itself, and the Matrix sender's name rides along in Linear's `createAsUser` field, so each comment shows the person who actually wrote it. Set `LINEAR_AUTH_MODE` to `oauth` and use the access token.
+- **Personal API key** as a fallback. Set `LINEAR_AUTH_MODE` to `api_key`. Linear then attributes **every bridged comment and issue to the person who owns that key**, and the Matrix sender's name is written into the comment body instead.
+
+## Loop prevention
+
+This is where naive bridges break, so all four cases are handled in D1 rather than in memory: a Worker instance does not survive between requests.
+
+- The Linear comment ID of every comment the bridge creates is stored, and webhooks for those IDs are dropped.
+- The Matrix event ID of every message the bridge sends is stored, and events sent by the bridge's own user are ignored.
+- Appservice transactions are retried by the homeserver under the same transaction ID, so a transaction is claimed before handling and skipped if it has been seen. A claim is released again if handling throws, so a genuine failure is still retried.
+- A scheduled job prunes the three dedupe tables after 30 days.
+
+## Security
+
+- The Linear signature is verified against the raw request body, before parsing, with a constant-time comparison. Timestamps further than a minute from local time are rejected.
+- The `hs_token` is verified on every appservice request.
+- Every token is a Wrangler secret.
+- At most 40 events are handled per transaction, so one busy room cannot exhaust the Worker's subrequest budget. A dropped remainder is logged rather than swallowed.
+
+## Not supported
+
+Deliberate omissions, not oversights:
+
+- **Message edits** (`m.replace`) are ignored. Bridging them would post a duplicate comment.
+- **Redactions** are ignored. Deleting the matching Linear comment on the strength of a Matrix redaction is not a trade the bridge makes on its own.
+- **Attachments** are noted, not transferred. `mxc://` needs authenticated media access, so the comment records that a file was attached and names it.
+- **Messages posted in a thread before it was mapped** are not backfilled. `!linear link` says so in its reply.
+- **Comment edits and deletions in Linear** do not propagate back to Matrix.
+- Markdown and HTML conversion covers what chat messages actually use: bold, italic, strikethrough, inline code, code blocks, links, lists and quotes. It is not a full CommonMark implementation.
+
+## Development
+
+```sh
+npm test           # vitest, against the real workerd runtime
+npm run typecheck
+npm run dev
+```
+
+## Licence
+
+MIT.

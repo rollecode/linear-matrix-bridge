@@ -1,0 +1,24 @@
+{
+  "name": "linear-matrix-bridge",
+  "version": "0.1.0",
+  "private": false,
+  "license": "MIT",
+  "description": "Two-way bridge between Linear issues and Matrix threads, running on a Cloudflare Worker",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "wrangler types && tsc --noEmit",
+    "test": "wrangler types && vitest run",
+    "migrate:local": "wrangler d1 migrations apply linear-matrix-bridge --local",
+    "migrate:remote": "wrangler d1 migrations apply linear-matrix-bridge --remote",
+    "types": "wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.1.2",
+    "@types/node": "^26.4.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.127.1"
+  }
+}

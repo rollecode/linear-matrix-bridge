@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "linear-matrix-bridge",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-30",
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "linear-matrix-bridge",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": {
+    "crons": ["17 4 * * *"]
+  },
+  // Secrets are set with `wrangler secret put` and never live here:
+  // MATRIX_AS_TOKEN, MATRIX_HS_TOKEN, LINEAR_TOKEN, LINEAR_WEBHOOK_SECRET
+  "vars": {
+    "MATRIX_HOMESERVER_URL": "https://matrix.example.org",
+    "MATRIX_BOT_USER_ID": "@linear:example.org",
+    "MATRIX_ALLOWED_ROOMS": "",
+    "LINEAR_TEAM_ID": "REPLACE_WITH_YOUR_LINEAR_TEAM_ID",
+    "LINEAR_AUTH_MODE": "api_key",
+    "COMMAND_PREFIX": "!linear"
+  }
+}
