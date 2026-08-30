@@ -1,10 +1,24 @@
-# linear-matrix-bridge
+<center align="center" style="text-align: center;justify-content:center;">
+<div align="center" style="text-align: center;justify-content:center;">
+<h1 align="center" style="text-align: center;justify-content:center;">
 
-A Matrix thread and a Linear issue become one conversation. Replies in the thread turn into comments on the issue, comments on the issue appear in the thread. It is not a notification feed: the point is that the discussion happens once, in whichever tool the person is already in.
+Linear to Matrix bridge
 
-Linear integrates with Slack and Discord but not Matrix, and matrix-hookshot bridges GitHub, GitLab, JIRA and OpenProject but not Linear. This fills that gap.
+<img style="justify-content:center;text-align: center;width: 95px; height: auto;" alt="image" src="public/linear-logo.png" />
 
-Runs as a Cloudflare Worker with a D1 database. Matrix application services are push-based and Linear webhooks are plain HTTP, so both directions are stateless request handling with no long-lived `/sync` connection and no process to patch.
+</h1>
+
+
+![Version](https://img.shields.io/badge/version-0.1.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
+
+</div>
+</center>
+
+<hr>
+
+A Matrix thread and a Linear issue become one conversation. Replies in the thread turn into comments on the issue, comments on the issue appear in the thread. It is not a notification feed: the point is that the discussion happens once, in whichever tool the person is already in. Linear integrates with Slack and Discord but not Matrix, and matrix-hookshot bridges GitHub, GitLab, JIRA and OpenProject but not Linear. This fills that gap.
+
+<hr>
 
 ## How it behaves
 
