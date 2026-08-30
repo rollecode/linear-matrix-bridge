@@ -53,7 +53,7 @@ export class MatrixClient {
       throw new MatrixError(`Matrix ${method} ${path} failed: ${response.status} ${await response.text()}`);
     }
 
-    return response.json<T>();
+    return (await response.json()) as T;
   }
 
   async getEvent(roomId: string, eventId: string): Promise<MatrixEvent> {

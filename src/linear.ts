@@ -56,7 +56,7 @@ export class LinearClient {
       throw new LinearError(`Linear API returned ${response.status}: ${await response.text()}`);
     }
 
-    const payload = await response.json<{ data?: T; errors?: { message: string }[] }>();
+    const payload = (await response.json()) as { data?: T; errors?: { message: string }[] };
     if (payload.errors?.length) {
       throw new LinearError(payload.errors.map((error) => error.message).join("; "));
     }

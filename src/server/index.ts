@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import worker from "../index.js";
 import type { Env, LinearAuthMode } from "../env.js";
+import type { BridgeExecutionContext } from "../runtime.js";
 import { SqliteD1 } from "./sqlite.js";
 
 /**
@@ -34,7 +35,7 @@ function loadMigrations(directory: string): { name: string; sql: string }[] {
 
 function buildEnv(db: SqliteD1): Env {
   return {
-    DB: db as unknown as D1Database,
+    DB: db,
     MATRIX_HOMESERVER_URL: required("MATRIX_HOMESERVER_URL"),
     MATRIX_BOT_USER_ID: required("MATRIX_BOT_USER_ID"),
     MATRIX_ALLOWED_ROOMS: process.env.MATRIX_ALLOWED_ROOMS ?? "",
@@ -102,17 +103,15 @@ const env = buildEnv(db);
 
 // The Worker's cron trigger has no equivalent here, so the prune runs on a timer.
 const prune = setInterval(() => {
-  worker.scheduled(undefined as never, env).catch((error: unknown) => console.error("Prune failed", error));
+  worker.scheduled({}, env).catch((error: unknown) => console.error("Prune failed", error));
 }, PRUNE_INTERVAL_MS);
 prune.unref();
 
-// Only `waitUntil` is ever called; the rest of ExecutionContext is Workers-only surface.
-const ctx = {
+const ctx: BridgeExecutionContext = {
   waitUntil(promise: Promise<unknown>) {
     promise.catch((error: unknown) => console.error("Background task failed", error));
   },
-  passThroughOnException() {},
-} as unknown as ExecutionContext;
+};
 
 const server = createServer((incoming, outgoing) => {
   void (async () => {

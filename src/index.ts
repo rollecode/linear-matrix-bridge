@@ -11,6 +11,7 @@ import {
 } from "./constants.js";
 import { claimTransaction, pruneDedupeTables, releaseTransaction } from "./db.js";
 import type { Env } from "./env.js";
+import type { BridgeExecutionContext, BridgeScheduledController } from "./runtime.js";
 import type { MatrixEvent } from "./matrix.js";
 import {
   handleWebhook,
@@ -45,7 +46,7 @@ function isHomeserver(request: Request, env: Env): boolean {
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: BridgeExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === HEALTH_PATH) {
@@ -76,7 +77,7 @@ export default {
     return matrixError(MATRIX_ERRCODE_UNRECOGNIZED, "Unknown endpoint", HTTP_NOT_FOUND);
   },
 
-  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+  async scheduled(_controller: BridgeScheduledController, env: Env): Promise<void> {
     await pruneDedupeTables(env.DB);
   },
 };
@@ -84,7 +85,7 @@ export default {
 async function handleTransactionRequest(
   request: Request,
   env: Env,
-  ctx: ExecutionContext,
+  ctx: BridgeExecutionContext,
   txnId: string,
 ): Promise<Response> {
   if (request.method !== "PUT") {
@@ -100,7 +101,10 @@ async function handleTransactionRequest(
     return json({});
   }
 
-  const body = await request.json<{ events?: MatrixEvent[] }>().catch(() => ({ events: [] }));
+  const body = await request
+    .json()
+    .then((parsed) => parsed as { events?: MatrixEvent[] })
+    .catch(() => ({ events: [] as MatrixEvent[] }));
 
   try {
     await handleTransaction(env, body.events ?? []);

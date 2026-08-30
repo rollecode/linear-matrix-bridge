@@ -9,5 +9,5 @@
     "declaration": false,
     "sourceMap": true
   },
-  "include": ["src/**/*.ts", "worker-configuration.d.ts"]
+  "include": ["src/**/*.ts"]
 }

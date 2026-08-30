@@ -1,7 +1,9 @@
+import type { BridgeDatabase } from "./runtime.js";
+
 export type LinearAuthMode = "api_key" | "oauth";
 
 export interface Env {
-  DB: D1Database;
+  DB: BridgeDatabase;
 
   MATRIX_HOMESERVER_URL: string;
   /** Full MXID of the bridge's own user, built from `sender_localpart` in registration.yaml. */
