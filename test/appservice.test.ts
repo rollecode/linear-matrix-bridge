@@ -75,6 +75,25 @@ describe("Matrix appservice transactions", () => {
     expect(comments[1]!.parentId).toBe("comment-uuid");
   });
 
+  it("joins a room when invited, and ignores invites meant for other users", async () => {
+    const invite = (target: string) => ({
+      type: "m.room.member",
+      event_id: `$invite-${target}`,
+      room_id: ROOM_ID,
+      sender: "@someone:matrix.test",
+      state_key: target,
+      content: { membership: "invite" },
+    });
+
+    await SELF.fetch(
+      transactionRequest("txn-invite", [invite(testEnv.MATRIX_BOT_USER_ID), invite("@other:matrix.test")]),
+    );
+
+    const joins = fetchStub.requests.filter((r) => r.url.includes("/join/"));
+    expect(joins).toHaveLength(1);
+    expect(decodeURIComponent(joins[0]!.url)).toContain(ROOM_ID);
+  });
+
   it("ignores messages in threads that are not mapped", async () => {
     await SELF.fetch(transactionRequest("txn-unmapped", [threadedMessage("$msg-3", "Chatter")]));
 
