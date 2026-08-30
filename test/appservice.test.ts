@@ -60,6 +60,21 @@ describe("Matrix appservice transactions", () => {
     expect(input.body).toContain("Test User");
   });
 
+  it("nests later comments under the first one, so Linear shows one thread", async () => {
+    await seedLink();
+
+    await SELF.fetch(transactionRequest("txn-first", [threadedMessage("$m1", "first message")]));
+    await SELF.fetch(transactionRequest("txn-second", [threadedMessage("$m2", "second message")]));
+
+    const comments = fetchStub.linearCalls
+      .filter((c) => String((c.body as { query: string }).query).includes("commentCreate"))
+      .map((c) => (c.body as { variables: { input: { body: string; parentId?: string } } }).variables.input);
+
+    expect(comments).toHaveLength(2);
+    expect(comments[0]!.parentId).toBeUndefined();
+    expect(comments[1]!.parentId).toBe("comment-uuid");
+  });
+
   it("ignores messages in threads that are not mapped", async () => {
     await SELF.fetch(transactionRequest("txn-unmapped", [threadedMessage("$msg-3", "Chatter")]));
 

@@ -83,8 +83,11 @@ export class LinearClient {
    * `createAsUser` attributes the comment to the Matrix sender, but Linear only
    * accepts it from an OAuth application running in actor=app mode.
    */
-  async createComment(issueId: string, body: string, authorName?: string): Promise<string> {
+  async createComment(issueId: string, body: string, authorName?: string, parentId?: string | null): Promise<string> {
     const input: Record<string, unknown> = { issueId, body };
+    if (parentId) {
+      input.parentId = parentId;
+    }
     if (this.actsAsApp && authorName) {
       input.createAsUser = authorName;
     }

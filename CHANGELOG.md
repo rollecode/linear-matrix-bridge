@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## 0.3.0 - 30.8.2026
+
+- Matrix thread maps to one Linear comment thread, not separate comments
+
 ## 0.2.1 - 30.8.2026
 
 - One failing event no longer wedges the appservice queue

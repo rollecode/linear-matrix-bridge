@@ -7,6 +7,7 @@ export interface Link {
   linear_issue_id: string;
   linear_issue_identifier: string;
   last_event_id: string | null;
+  linear_parent_comment_id: string | null;
   created_at: number;
 }
 
@@ -36,7 +37,10 @@ export async function findLinkByIssue(db: BridgeDatabase, linearIssueId: string)
 }
 
 /** Returns false when the thread or the issue is already linked. */
-export async function createLink(db: BridgeDatabase, link: Omit<Link, "created_at" | "last_event_id">): Promise<boolean> {
+export async function createLink(
+  db: BridgeDatabase,
+  link: Omit<Link, "created_at" | "last_event_id" | "linear_parent_comment_id">,
+): Promise<boolean> {
   const result = await db
     .prepare(
       `INSERT OR IGNORE INTO links
@@ -53,6 +57,18 @@ export async function createLink(db: BridgeDatabase, link: Omit<Link, "created_a
     .run();
 
   return result.meta.changes > 0;
+}
+
+/** The Linear comment every later bridged comment nests under, so one Matrix thread is one Linear thread. */
+export async function setLinearParentComment(
+  db: BridgeDatabase,
+  threadRootEventId: string,
+  commentId: string,
+): Promise<void> {
+  await db
+    .prepare("UPDATE links SET linear_parent_comment_id = ? WHERE thread_root_event_id = ? AND linear_parent_comment_id IS NULL")
+    .bind(commentId, threadRootEventId)
+    .run();
 }
 
 /** Tracked so threaded replies can fall back to the newest event in the thread, as MSC3440 asks. */

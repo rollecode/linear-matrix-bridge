@@ -5,7 +5,15 @@ import {
   REPLACE_REL_TYPE,
   THREAD_REL_TYPE,
 } from "./constants.js";
-import { createLink, findLinkByThread, isSentEvent, recordSentComment, recordSentEvent, setLastEvent } from "./db.js";
+import {
+  createLink,
+  findLinkByThread,
+  isSentEvent,
+  recordSentComment,
+  recordSentEvent,
+  setLastEvent,
+  setLinearParentComment,
+} from "./db.js";
 import { isRoomAllowed, type Env } from "./env.js";
 import { LinearClient } from "./linear.js";
 import { htmlToMarkdown, stripReplyFallback } from "./markdown.js";
@@ -108,10 +116,20 @@ async function handleMessage(bridge: Bridge, event: MatrixEvent): Promise<void> 
   const authorName = await bridge.matrix.getDisplayName(event.sender);
   const commentBody = bridge.linear.attributesToApp ? text : `**${authorName}** on Matrix:\n\n${text}`;
 
-  const commentId = await bridge.linear.createComment(link.linear_issue_id, commentBody, authorName);
+  const commentId = await bridge.linear.createComment(
+    link.linear_issue_id,
+    commentBody,
+    authorName,
+    link.linear_parent_comment_id,
+  );
 
   // Linear will webhook this comment straight back at us; remember it so we drop it.
   await recordSentComment(bridge.env.DB, commentId);
+
+  // The first one opens the Linear comment thread that the rest nest under.
+  if (!link.linear_parent_comment_id) {
+    await setLinearParentComment(bridge.env.DB, link.thread_root_event_id, commentId);
+  }
   await setLastEvent(bridge.env.DB, link.thread_root_event_id, event.event_id);
 }
 
