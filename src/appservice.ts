@@ -19,7 +19,7 @@ import {
   setLinearParentComment,
 } from "./db.js";
 import { isRoomAllowed, type Env } from "./env.js";
-import { LinearClient } from "./linear.js";
+import { LinearClient, type LinearIssue } from "./linear.js";
 import { htmlToMarkdown, stripReplyFallback } from "./markdown.js";
 import { issueIdentifierIn, looksLikeUnlink, mentionsBot, withoutMention } from "./mention.js";
 import {
@@ -213,6 +213,39 @@ async function handleMention(bridge: Bridge, event: MatrixEvent, body: string): 
   await suggestAndLink(bridge, event, anchor);
 }
 
+/**
+ * Every route that maps a thread to an issue goes through here: create the
+ * link, attach the thread, and carry across what was already said. Keeping
+ * these apart is how the mention path silently lost thread history.
+ */
+async function establishLink(
+  bridge: Bridge,
+  event: MatrixEvent,
+  anchor: string,
+  issue: LinearIssue,
+): Promise<{ linked: boolean; note: string }> {
+  const linked = await createLink(bridge.env.DB, {
+    matrix_room_id: event.room_id,
+    thread_root_event_id: anchor,
+    linear_issue_id: issue.id,
+    linear_issue_identifier: issue.identifier,
+  });
+
+  if (!linked) {
+    return { linked: false, note: "" };
+  }
+
+  await attachThread(bridge, issue.id, event.room_id, anchor);
+
+  const carried =
+    anchor === event.event_id
+      ? { bridged: 0, unreadable: 0 }
+      : await backfillThread(bridge, issue.id, issue.identifier, event, anchor);
+
+  console.log(`Linked ${issue.identifier} to thread ${anchor} in ${event.room_id}`);
+  return { linked: true, note: backfillNote(carried) };
+}
+
 async function relink(bridge: Bridge, event: MatrixEvent, anchor: string, identifier: string): Promise<void> {
   const issue = await bridge.linear.findIssueByIdentifier(identifier);
   if (!issue) {
@@ -220,16 +253,8 @@ async function relink(bridge: Bridge, event: MatrixEvent, anchor: string, identi
     return;
   }
 
-  await createLink(bridge.env.DB, {
-    matrix_room_id: event.room_id,
-    thread_root_event_id: anchor,
-    linear_issue_id: issue.id,
-    linear_issue_identifier: issue.identifier,
-  });
-  await attachThread(bridge, issue.id, event.room_id, anchor);
-  console.log(`Linked ${issue.identifier} to thread ${anchor} in ${event.room_id}`);
-
-  await reply(bridge, event.room_id, anchor, `Linked to **${issue.identifier}** ${issue.title}\n${issue.url}`);
+  const { note } = await establishLink(bridge, event, anchor, issue);
+  await reply(bridge, event.room_id, anchor, `Linked to **${issue.identifier}** ${issue.title}\n${issue.url}${note}`);
 }
 
 /** Ranking happens inside Linear, so the bridge never holds a prompt of its own. */
@@ -242,38 +267,38 @@ async function suggestAndLink(bridge: Bridge, event: MatrixEvent, anchor: string
     return;
   }
 
-  await createLink(bridge.env.DB, {
-    matrix_room_id: event.room_id,
-    thread_root_event_id: anchor,
-    linear_issue_id: best.id,
-    linear_issue_identifier: best.identifier,
-  });
-  await attachThread(bridge, best.id, event.room_id, anchor);
-  console.log(`Suggested and linked ${best.identifier} for thread ${anchor}`);
+  const { note } = await establishLink(bridge, event, anchor, best);
 
   const alternatives = rest.length > 0 ? `\n\nOther candidates: ${rest.map((i) => i.identifier).join(", ")}.` : "";
   await reply(
     bridge,
     event.room_id,
     anchor,
-    `Linked to **${best.identifier}** ${best.title}\n${best.url}${alternatives}\n\nWrong one? Mention me with the right identifier, or say unlink.`,
+    `Linked to **${best.identifier}** ${best.title}\n${best.url}${note}${alternatives}\n\nWrong one? Mention me with the right identifier, or say unlink.`,
   );
 }
 
+/**
+ * The thread is the evidence; the sentence asking for a link is not. Including
+ * it measurably pollutes the ranking, so it is used only when there is no
+ * thread to read.
+ */
 async function threadQuery(bridge: Bridge, event: MatrixEvent, anchor: string): Promise<string> {
-  const own = withoutMention(messageText(event), bridge.env.MATRIX_BOT_USER_ID, bridge.env.MATRIX_BOT_NAME ?? "");
+  if (anchor !== event.event_id) {
+    const history = await bridge.matrix.fetchThreadMessages(event.room_id, anchor, MAX_QUERY_MESSAGES);
+    const text = history.messages
+      .filter((message) => message.sender !== bridge.env.MATRIX_BOT_USER_ID && message.event_id !== event.event_id)
+      .map((message) => messageText(message))
+      .join("\n")
+      .trim();
 
-  if (anchor === event.event_id) {
-    return own.slice(0, MAX_QUERY_LENGTH);
+    if (text) {
+      return text.slice(0, MAX_QUERY_LENGTH);
+    }
   }
 
-  const history = await bridge.matrix.fetchThreadMessages(event.room_id, anchor, MAX_QUERY_MESSAGES);
-  const text = history.messages
-    .filter((message) => message.sender !== bridge.env.MATRIX_BOT_USER_ID && message.event_id !== event.event_id)
-    .map((message) => messageText(message))
-    .join("\n");
-
-  return `${text}\n${own}`.trim().slice(0, MAX_QUERY_LENGTH);
+  const own = withoutMention(messageText(event), bridge.env.MATRIX_BOT_USER_ID, bridge.env.MATRIX_BOT_NAME ?? "");
+  return own.slice(0, MAX_QUERY_LENGTH);
 }
 
 async function handleCommand(bridge: Bridge, event: MatrixEvent, rest: string): Promise<void> {
@@ -316,31 +341,14 @@ async function linkExistingIssue(
     return;
   }
 
-  const linked = await createLink(bridge.env.DB, {
-    matrix_room_id: event.room_id,
-    thread_root_event_id: anchor,
-    linear_issue_id: issue.id,
-    linear_issue_identifier: issue.identifier,
-  });
+  const { linked, note } = await establishLink(bridge, event, anchor, issue);
 
   if (!linked) {
     await reply(bridge, event.room_id, anchor, `This thread is already linked to an issue.`);
     return;
   }
 
-  console.log(`Linked ${issue.identifier} to thread ${anchor} in ${event.room_id}`);
-  await attachThread(bridge, issue.id, event.room_id, anchor);
-
-  const carried = threadRootEventId
-    ? await backfillThread(bridge, issue.id, issue.identifier, event, anchor)
-    : { bridged: 0, unreadable: 0 };
-
-  await reply(
-    bridge,
-    event.room_id,
-    anchor,
-    `Linked to **${issue.identifier}** ${issue.title}\n${issue.url}${backfillNote(carried)}`,
-  );
+  await reply(bridge, event.room_id, anchor, `Linked to **${issue.identifier}** ${issue.title}\n${issue.url}${note}`);
 }
 
 function backfillNote(carried: { bridged: number; unreadable: number }): string {

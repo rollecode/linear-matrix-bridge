@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 1.1.1 - 5.9.2026
+
+- Carry thread history across on every link path
+- Search on the thread, not on the sentence asking
+
 ## 1.1.0 - 5.9.2026
 
 - Link by mentioning the bot in plain language

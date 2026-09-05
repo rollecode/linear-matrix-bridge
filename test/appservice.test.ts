@@ -366,6 +366,85 @@ describe("Matrix appservice transactions", () => {
     expect(fetchStub.linearCalls).toHaveLength(0);
   });
 
+  it("searches on the thread, not on the sentence asking for a link", async () => {
+    fetchStub.quotedEvent = {
+      type: "m.room.message",
+      event_id: "$topic-root",
+      room_id: ROOM_ID,
+      sender: "@robin:matrix.test",
+      content: { msgtype: "m.text", body: "the deploy keeps timing out on staging" },
+    };
+    fetchStub.threadRelations = [];
+
+    await SELF.fetch(
+      transactionRequest("txn-query", [
+        mentionMessage("$ask", "look for the task, I forget what this was about", "$topic-root"),
+      ]),
+    );
+
+    const searched = fetchStub.linearCalls.find((c) =>
+      String((c.body as { query: string }).query).includes("semanticSearch"),
+    );
+    const term = (searched!.body as { variables: { query: string } }).variables.query;
+
+    expect(term).toContain("deploy keeps timing out");
+    expect(term).not.toContain("I forget what this was about");
+  });
+
+  it("carries the earlier conversation across when the bot picks the issue itself", async () => {
+    fetchStub.quotedEvent = {
+      type: "m.room.message",
+      event_id: "$half-hour",
+      room_id: ROOM_ID,
+      sender: "@robin:matrix.test",
+      content: { msgtype: "m.text", body: "the deploy keeps timing out on staging" },
+    };
+    fetchStub.threadRelations = [
+      {
+        type: "m.room.message",
+        event_id: "$half-hour-2",
+        room_id: ROOM_ID,
+        sender: "@sam:matrix.test",
+        content: { msgtype: "m.text", body: "looks like the health check is too slow" },
+      },
+    ];
+
+    await SELF.fetch(
+      transactionRequest("txn-nl-backfill", [mentionMessage("$ask-b", "link this to whatever it is", "$half-hour")]),
+    );
+
+    const bodies = fetchStub.linearCalls
+      .filter((c) => String((c.body as { query: string }).query).includes("commentCreate"))
+      .map((c) => (c.body as { variables: { input: { body: string } } }).variables.input.body);
+
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0]).toContain("deploy keeps timing out");
+    expect(bodies[1]).toContain("health check is too slow");
+    expect((fetchStub.matrixSends[0]!.body as { body: string }).body).toContain("Copied 2 earlier messages");
+  });
+
+  it("carries it across when a person names the issue in plain language", async () => {
+    fetchStub.quotedEvent = {
+      type: "m.room.message",
+      event_id: "$named-root",
+      room_id: ROOM_ID,
+      sender: "@robin:matrix.test",
+      content: { msgtype: "m.text", body: "the certificate expired overnight" },
+    };
+    fetchStub.threadRelations = [];
+
+    await SELF.fetch(
+      transactionRequest("txn-nl-named", [mentionMessage("$ask-n", `this is ${ISSUE_IDENTIFIER}`, "$named-root")]),
+    );
+
+    const bodies = fetchStub.linearCalls
+      .filter((c) => String((c.body as { query: string }).query).includes("commentCreate"))
+      .map((c) => (c.body as { variables: { input: { body: string } } }).variables.input.body);
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toContain("certificate expired overnight");
+  });
+
   it("links an existing issue to the current thread", async () => {
     const command = {
       type: "m.room.message",
