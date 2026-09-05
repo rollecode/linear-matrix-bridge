@@ -195,7 +195,7 @@ async function linkExistingIssue(
   });
 
   if (!linked) {
-    await reply(bridge, event.room_id, anchor, `${issue.identifier} is already linked to another thread.`);
+    await reply(bridge, event.room_id, anchor, `This thread is already linked to an issue.`);
     return;
   }
 
@@ -245,7 +245,7 @@ async function createIssueFromCommand(
   });
 
   console.log(`Created ${issue.identifier} from ${event.room_id}, thread ${anchor}, linked=${linked}`);
-  const note = linked ? "" : "\n\nThat thread was already linked, so this issue is not bridged.";
+  const note = linked ? "" : "\n\nThis thread was already linked, so the new issue is not bridged to it.";
   await reply(bridge, event.room_id, anchor, `Created **${issue.identifier}** ${issue.title}\n${issue.url}${note}`);
 }
 

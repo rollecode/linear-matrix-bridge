@@ -11,6 +11,7 @@ interface PreparedStatement {
   bind(...values: unknown[]): PreparedStatement;
   run(): Promise<{ meta: { changes: number } }>;
   first<T>(): Promise<T | null>;
+  all<T>(): Promise<{ results: T[] }>;
 }
 
 class SqliteStatement implements PreparedStatement {
@@ -30,6 +31,11 @@ class SqliteStatement implements PreparedStatement {
 
   async first<T>(): Promise<T | null> {
     return (this.statement.get(...(this.values as never[])) as T | undefined) ?? null;
+  }
+
+  /** Wrapped in `results` so the shape matches D1's. */
+  async all<T>(): Promise<{ results: T[] }> {
+    return { results: this.statement.all(...(this.values as never[])) as T[] };
   }
 }
 

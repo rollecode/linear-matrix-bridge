@@ -32,11 +32,17 @@ export async function findLinkByThread(db: BridgeDatabase, roomId: string, threa
     .first<Link>();
 }
 
-export async function findLinkByIssue(db: BridgeDatabase, linearIssueId: string): Promise<Link | null> {
-  return db.prepare("SELECT * FROM links WHERE linear_issue_id = ?").bind(linearIssueId).first<Link>();
+/** One issue can back several threads, so Linear-side events fan out to all of them. */
+export async function findLinksByIssue(db: BridgeDatabase, linearIssueId: string): Promise<Link[]> {
+  const rows = await db
+    .prepare("SELECT * FROM links WHERE linear_issue_id = ? ORDER BY created_at")
+    .bind(linearIssueId)
+    .all<Link>();
+
+  return rows.results;
 }
 
-/** Returns false when the thread or the issue is already linked. */
+/** Returns false when that thread is already linked to something. */
 export async function createLink(
   db: BridgeDatabase,
   link: Omit<Link, "created_at" | "last_event_id" | "linear_parent_comment_id">,

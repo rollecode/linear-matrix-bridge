@@ -18,6 +18,7 @@ export interface BridgePreparedStatement {
   bind(...values: unknown[]): BridgePreparedStatement;
   run(): Promise<{ meta: { changes: number } }>;
   first<T>(): Promise<T | null>;
+  all<T>(): Promise<{ results: T[] }>;
 }
 
 /** D1 and the SQLite adapter both satisfy this; nothing else is used. */

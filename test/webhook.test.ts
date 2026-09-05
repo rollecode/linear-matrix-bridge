@@ -110,6 +110,40 @@ describe("Linear webhook", () => {
     expect((fetchStub.matrixSends[0]!.body as { body: string }).body).toContain("In Progress");
   });
 
+  it("fans a comment out to every thread linked to the issue", async () => {
+    await seedLink(null, "$second-thread", "!other-room:matrix.test");
+
+    await SELF.fetch(await signedWebhookRequest(commentPayload("linear-comment-fanout")));
+
+    expect(fetchStub.matrixSends).toHaveLength(2);
+    const roots = fetchStub.matrixSends.map(
+      (s) => (s.body as { "m.relates_to": { event_id: string } })["m.relates_to"].event_id,
+    );
+    expect(roots.sort()).toEqual([THREAD_ROOT, "$second-thread"].sort());
+  });
+
+  it("still posts to the other threads when one room rejects the send", async () => {
+    await seedLink(null, "$second-thread", "!other-room:matrix.test");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const inner = globalThis.fetch as unknown as typeof fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        if (url.includes(encodeURIComponent("!other-room:matrix.test"))) {
+          return new Response("nope", { status: 403 });
+        }
+        return inner(input, init);
+      }),
+    );
+
+    const response = await SELF.fetch(await signedWebhookRequest(commentPayload("linear-comment-partial")));
+
+    expect(response.status).toBe(200);
+    expect(fetchStub.matrixSends).toHaveLength(1);
+  });
+
   it("builds the thread relation the way MSC3440 describes", async () => {
     await SELF.fetch(await signedWebhookRequest(commentPayload()));
 

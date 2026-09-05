@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 0.6.0 - 5.9.2026
+
+- Many Matrix threads can link to one issue
+- Linear comments fan out to every linked thread
+
 ## 0.5.1 - 5.9.2026
 
 - Log commands, links and bridged comments

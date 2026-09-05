@@ -118,13 +118,17 @@ export async function resetDb(): Promise<void> {
   ]);
 }
 
-export async function seedLink(lastEventId: string | null = null): Promise<void> {
+export async function seedLink(
+  lastEventId: string | null = null,
+  threadRoot: string = THREAD_ROOT,
+  roomId: string = ROOM_ID,
+): Promise<void> {
   await env.DB.prepare(
     `INSERT INTO links
      (matrix_room_id, thread_root_event_id, linear_issue_id, linear_issue_identifier, last_event_id, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
   )
-    .bind(ROOM_ID, THREAD_ROOT, ISSUE_ID, ISSUE_IDENTIFIER, lastEventId, Date.now())
+    .bind(roomId, threadRoot, ISSUE_ID, ISSUE_IDENTIFIER, lastEventId, Date.now())
     .run();
 }
 

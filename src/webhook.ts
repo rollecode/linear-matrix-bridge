@@ -1,5 +1,5 @@
 import { WEBHOOK_MAX_CLOCK_SKEW_MS } from "./constants.js";
-import { findLinkByIssue, isSentComment, recordSentEvent, setLastEvent } from "./db.js";
+import { findLinksByIssue, isSentComment, recordSentEvent, setLastEvent, type Link } from "./db.js";
 import type { Env } from "./env.js";
 import { hmacSha256Hex, timingSafeEqual } from "./crypto.js";
 import { HttpMatrixClient, type MatrixGateway } from "./matrix.js";
@@ -76,13 +76,12 @@ async function handleCommentCreated(env: Env, payload: LinearWebhookPayload, mat
     return;
   }
 
-  const link = await findLinkByIssue(env.DB, comment.issueId);
-  if (!link) {
-    return;
-  }
-
+  const links = await findLinksByIssue(env.DB, comment.issueId);
   const author = comment.user?.name ?? payload.actor?.name ?? "Linear";
-  await postToThread(env, matrix, link.matrix_room_id, link.thread_root_event_id, link.last_event_id, `**${author}** on ${link.linear_issue_identifier}:\n\n${comment.body}`);
+
+  for (const link of links) {
+    await postToThread(env, matrix, link, `**${author}** on ${link.linear_issue_identifier}:\n\n${comment.body}`);
+  }
 }
 
 async function handleIssueStateChange(env: Env, payload: LinearWebhookPayload, matrix: MatrixGateway): Promise<void> {
@@ -96,31 +95,24 @@ async function handleIssueStateChange(env: Env, payload: LinearWebhookPayload, m
     return;
   }
 
-  const link = await findLinkByIssue(env.DB, issue.id);
-  if (!link) {
-    return;
+  for (const link of await findLinksByIssue(env.DB, issue.id)) {
+    await postToThread(env, matrix, link, `${link.linear_issue_identifier} moved to **${stateName}**`);
   }
-
-  await postToThread(
-    env,
-    matrix,
-    link.matrix_room_id,
-    link.thread_root_event_id,
-    link.last_event_id,
-    `${link.linear_issue_identifier} moved to **${stateName}**`,
-  );
 }
 
-async function postToThread(
-  env: Env,
-  matrix: MatrixGateway,
-  roomId: string,
-  threadRootEventId: string,
-  lastEventId: string | null,
-  markdown: string,
-): Promise<void> {
-  const eventId = await matrix.sendThreadMessage(roomId, threadRootEventId, lastEventId ?? threadRootEventId, markdown);
+/** One thread failing must not stop the others from getting the update. */
+async function postToThread(env: Env, matrix: MatrixGateway, link: Link, markdown: string): Promise<void> {
+  try {
+    const eventId = await matrix.sendThreadMessage(
+      link.matrix_room_id,
+      link.thread_root_event_id,
+      link.last_event_id ?? link.thread_root_event_id,
+      markdown,
+    );
 
-  await recordSentEvent(env.DB, eventId);
-  await setLastEvent(env.DB, threadRootEventId, eventId);
+    await recordSentEvent(env.DB, eventId);
+    await setLastEvent(env.DB, link.thread_root_event_id, eventId);
+  } catch (error) {
+    console.error(`Could not post to thread ${link.thread_root_event_id} in ${link.matrix_room_id}`, error);
+  }
 }
