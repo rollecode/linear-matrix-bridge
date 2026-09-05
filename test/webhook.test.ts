@@ -65,7 +65,7 @@ describe("Linear webhook", () => {
     expect(fetchStub.matrixSends).toHaveLength(1);
 
     const content = fetchStub.matrixSends[0]!.body as { body: string };
-    expect(content.body).toContain("Robin");
+    expect(content.body).toContain("**Robin** posted on Linear (MEM-42)");
     expect(content.body).toContain("Looks good to me");
   });
 

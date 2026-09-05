@@ -6,7 +6,7 @@
 <img style="justify-content:center;text-align: center;width: 180px; height: auto;"  width="1600" height="400" alt="Linear" src="https://github.com/user-attachments/assets/8c2d5756-0e3f-432a-8a3d-1d0e8293539a" /> &nbsp; <img style="justify-content:center;text-align: center;width: 100px; height: auto;" width="1920" height="820" alt="Matrix" src="https://github.com/user-attachments/assets/8685c940-eb6d-4417-8300-6979c0ce3821" />
 
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
+![Version](https://img.shields.io/badge/version-1.2.1-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
 
 </div>
 </center>
@@ -39,7 +39,7 @@ A Matrix thread and a Linear issue become one conversation. Replies in the threa
 
 | In Linear | What happens |
 | --- | --- |
-| A comment on a mapped issue | Posted into every thread linked to that issue, with the Linear author's name. |
+| A comment on a mapped issue | Posted into every thread linked to that issue as "**Rolle** posted on Linear (MEM-6)". Matrix has no per-message identity override for a single user, so the author is named in the body rather than shown as the sender. |
 | An issue state change | A one-line note in every linked thread. State changes only, not every field update. |
 
 Every linked thread is also added to the issue as an attachment, so it appears under **Resources** with a Matrix icon alongside any Slack or GitHub links.

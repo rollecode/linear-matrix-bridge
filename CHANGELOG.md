@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 1.2.1 - 5.9.2026
+
+- Name the author and origin on bridged messages
+- Keep instructions to the bot out of the issue
+
 ## 1.2.0 - 5.9.2026
 
 - Condense a thread into an English search phrase

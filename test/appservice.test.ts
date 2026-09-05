@@ -58,7 +58,7 @@ describe("Matrix appservice transactions", () => {
 
     expect(input.issueId).toBe(ISSUE_ID);
     expect(input.body).toContain("Still failing on staging");
-    expect(input.body).toContain("Test User");
+    expect(input.body).toContain("**Test User** posted on Matrix");
   });
 
   it("nests later comments under the first one, so Linear shows one thread", async () => {
@@ -483,6 +483,41 @@ describe("Matrix appservice transactions", () => {
     );
     expect(searched).toBeUndefined();
     expect((fetchStub.matrixSends[0]!.body as { body: string }).body).toContain("cannot tell what this thread is about");
+  });
+
+  it("does not copy the instruction to the bot into the issue", async () => {
+    fetchStub.quotedEvent = {
+      type: "m.room.message",
+      event_id: "$disc-root",
+      room_id: ROOM_ID,
+      sender: "@robin:matrix.test",
+      content: { msgtype: "m.text", body: "the migration should run on the old host" },
+    };
+    fetchStub.threadRelations = [
+      {
+        type: "m.room.message",
+        event_id: "$the-ask",
+        room_id: ROOM_ID,
+        sender: "@sam:matrix.test",
+        content: {
+          msgtype: "m.text",
+          body: "Linear: link this to the right task",
+          "m.mentions": { user_ids: ["@linear:matrix.test"] },
+        },
+      },
+    ];
+
+    await SELF.fetch(
+      transactionRequest("txn-skip-ask", [mentionMessage("$ask-s", `this is ${ISSUE_IDENTIFIER}`, "$disc-root")]),
+    );
+
+    const bodies = fetchStub.linearCalls
+      .filter((c) => String((c.body as { query: string }).query).includes("commentCreate"))
+      .map((c) => (c.body as { variables: { input: { body: string } } }).variables.input.body);
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toContain("migration should run on the old host");
+    expect(bodies.join()).not.toContain("link this to the right task");
   });
 
   it("links an existing issue to the current thread", async () => {

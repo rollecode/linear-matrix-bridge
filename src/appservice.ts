@@ -143,7 +143,7 @@ async function handleMessage(bridge: Bridge, event: MatrixEvent): Promise<void> 
   }
 
   const authorName = await bridge.matrix.getDisplayName(event.sender);
-  const commentBody = bridge.linear.attributesToApp ? text : `**${authorName}** on Matrix:\n\n${text}`;
+  const commentBody = bridge.linear.attributesToApp ? text : `**${authorName}** posted on Matrix:\n\n${text}`;
 
   const commentId = await bridge.linear.createComment(
     link.linear_issue_id,
@@ -431,6 +431,11 @@ async function backfillThread(
       continue;
     }
 
+    // Instructions aimed at the bot are not part of the discussion.
+    if (mentionsBot(message.content, bridge.env.MATRIX_BOT_USER_ID)) {
+      continue;
+    }
+
     const text = messageText(message);
     if (!text || text.startsWith(bridge.env.COMMAND_PREFIX)) {
       continue;
@@ -439,7 +444,7 @@ async function backfillThread(
     const authorName = await bridge.matrix.getDisplayName(message.sender);
     const commentId = await bridge.linear.createComment(
       issueId,
-      bridge.linear.attributesToApp ? text : `**${authorName}** on Matrix:\n\n${text}`,
+      bridge.linear.attributesToApp ? text : `**${authorName}** posted on Matrix:\n\n${text}`,
       authorName,
       parentId,
     );

@@ -80,7 +80,7 @@ async function handleCommentCreated(env: Env, payload: LinearWebhookPayload, mat
   const author = comment.user?.name ?? payload.actor?.name ?? "Linear";
 
   for (const link of links) {
-    await postToThread(env, matrix, link, `**${author}** on ${link.linear_issue_identifier}:\n\n${comment.body}`);
+    await postToThread(env, matrix, link, `**${author}** posted on Linear (${link.linear_issue_identifier}):\n\n${comment.body}`);
   }
 }
 
