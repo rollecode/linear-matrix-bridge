@@ -24,6 +24,13 @@ const CREATE_ATTACHMENT = `mutation CreateAttachment($input: AttachmentCreateInp
   attachmentCreate(input: $input) { success attachment { id } }
 }`;
 
+const SEMANTIC_SEARCH = `query Suggest($query: String!, $maxResults: Int!) {
+  semanticSearch(query: $query, maxResults: $maxResults, types: [issue]) {
+    enabled
+    results { issue { ${ISSUE_FIELDS} } }
+  }
+}`;
+
 const FIND_ISSUE = `query FindIssue($teamKey: String!, $number: Float!) {
   issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }, first: 1) {
     nodes { ${ISSUE_FIELDS} }
@@ -119,6 +126,23 @@ export class LinearClient {
     await this.graphql<{ attachmentCreate: { success: boolean } }>(CREATE_ATTACHMENT, {
       input: { issueId, url, title, subtitle, iconUrl },
     });
+  }
+
+  /**
+   * Linear's own semantic search. Keeping the ranking on their side means the
+   * bridge runs no model and holds no prompt that could be talked into
+   * answering something else.
+   */
+  async suggestIssues(query: string, maxResults: number): Promise<LinearIssue[]> {
+    const data = await this.graphql<{
+      semanticSearch: { enabled: boolean; results: { issue: LinearIssue | null }[] };
+    }>(SEMANTIC_SEARCH, { query, maxResults });
+
+    if (!data.semanticSearch.enabled) {
+      return [];
+    }
+
+    return data.semanticSearch.results.map((result) => result.issue).filter((issue): issue is LinearIssue => !!issue);
   }
 
   async findIssueByIdentifier(identifier: string): Promise<LinearIssue | null> {

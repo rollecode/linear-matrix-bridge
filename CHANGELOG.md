@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 1.1.0 - 5.9.2026
+
+- Link by mentioning the bot in plain language
+- Pick the issue with Linear semantic search
+- Relink and unlink to correct a wrong guess
+
 ## 1.0.0 - 5.9.2026
 
 - Running in production

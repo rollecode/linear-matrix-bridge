@@ -103,6 +103,18 @@ function linearResponse(query: string): unknown {
     return { commentCreate: { success: true, comment: { id: `comment-${commentCounter++}` } } };
   }
 
+  if (query.includes("semanticSearch")) {
+    return {
+      semanticSearch: {
+        enabled: true,
+        results: [
+          { issue: { id: ISSUE_ID, identifier: ISSUE_IDENTIFIER, title: "Fix the login bug", url: "https://linear.app/test/issue/" + ISSUE_IDENTIFIER } },
+          { issue: { id: "other-id", identifier: "MEM-99", title: "Something else", url: "https://linear.app/test/issue/MEM-99" } },
+        ],
+      },
+    };
+  }
+
   if (query.includes("attachmentCreate")) {
     return { attachmentCreate: { success: true, attachment: { id: "attachment-uuid" } } };
   }
@@ -143,6 +155,19 @@ export async function seedLink(
   )
     .bind(roomId, threadRoot, ISSUE_ID, ISSUE_IDENTIFIER, lastEventId, Date.now())
     .run();
+}
+
+export function mentionMessage(eventId: string, body: string, threadRoot?: string) {
+  const content: Record<string, unknown> = {
+    msgtype: "m.text",
+    body,
+    "m.mentions": { user_ids: ["@linear:matrix.test"] },
+  };
+  if (threadRoot) {
+    content["m.relates_to"] = { rel_type: "m.thread", event_id: threadRoot, is_falling_back: true };
+  }
+
+  return { type: "m.room.message", event_id: eventId, room_id: ROOM_ID, sender: "@sam:matrix.test", content };
 }
 
 export function threadedMessage(eventId: string, body: string, sender = "@sam:matrix.test") {

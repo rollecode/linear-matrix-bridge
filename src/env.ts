@@ -17,6 +17,8 @@ export interface Env {
   /** Comma-separated room IDs the bridge acts in. Empty means every room it is invited to. */
   MATRIX_ALLOWED_ROOMS: string;
   COMMAND_PREFIX: string;
+  /** Display name, stripped from a mention before it becomes a search query. */
+  MATRIX_BOT_NAME?: string;
   /** Shown as the attachment subtitle on Linear issues. */
   MATRIX_HOMESERVER_NAME?: string;
   /** Icon for the Linear attachment, so the thread shows a Matrix mark under Resources. */

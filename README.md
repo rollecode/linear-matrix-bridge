@@ -6,7 +6,7 @@
 <img style="justify-content:center;text-align: center;width: 180px; height: auto;"  width="1600" height="400" alt="Linear" src="https://github.com/user-attachments/assets/8c2d5756-0e3f-432a-8a3d-1d0e8293539a" /> &nbsp; <img style="justify-content:center;text-align: center;width: 100px; height: auto;" width="1920" height="820" alt="Matrix" src="https://github.com/user-attachments/assets/8685c940-eb6d-4417-8300-6979c0ce3821" />
 
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
 
 </div>
 </center>
@@ -29,6 +29,8 @@ A Matrix thread and a Linear issue become one conversation. Replies in the threa
 
 | In Matrix | What happens |
 | --- | --- |
+| Mention the bot: "can you link this to the right task?" | Searches Linear for the issue this thread is about, links it, and says which one it picked. |
+| Mention it with an identifier, or say it picked wrong | Moves the link, or removes it. |
 | `!linear Fix the login bug` | Creates an issue in the configured team. The bot replies in a thread with the identifier and URL, and that thread is now mapped to the issue. |
 | `!linear` as a reply to a message | Uses the replied-to message as the description and as the thread anchor. Without a title, the first line of that message becomes the title. |
 | `!linear link MEM-42` | Maps the current thread to an issue that already exists, and copies what was already said in it onto the issue. Several threads, in different rooms, can point at the same issue. |
@@ -75,6 +77,7 @@ Set the non-secret values in the `vars` block of `wrangler.jsonc`:
 | `LINEAR_TEAM_ID` | UUID of the team that `!linear <title>` creates issues in. |
 | `LINEAR_AUTH_MODE` | `oauth` or `api_key`. See below. |
 | `COMMAND_PREFIX` | Defaults to `!linear`. |
+| `MATRIX_BOT_NAME` | Display name, stripped from a mention before it becomes a search query. |
 | `MATRIX_HOMESERVER_NAME` | Subtitle on the Linear attachment. Falls back to the room ID. |
 | `MATRIX_ICON_URL` | Publicly reachable icon for that attachment. `public/matrix-icon.png` ships with the repo and the example vhost serves it. |
 
@@ -131,6 +134,7 @@ Configuration comes from the environment rather than `wrangler.jsonc`. Put the f
 MATRIX_HOMESERVER_URL=https://matrix.example.org
 MATRIX_BOT_USER_ID=@linear:example.org
 MATRIX_ALLOWED_ROOMS=
+MATRIX_BOT_NAME=Linear
 MATRIX_HOMESERVER_NAME=example.org
 MATRIX_ICON_URL=https://linear.example.org/matrix-icon.png
 LINEAR_TEAM_ID=
@@ -155,6 +159,12 @@ curl -s http://127.0.0.1:5055/health
 Migrations apply themselves at startup, tracked in a `d1_migrations` table, so there is no separate migrate step. The dedupe prune runs on a daily timer in place of the Worker's cron trigger.
 
 The bridge binds to localhost. Synapse reaches it there, so the only thing that has to be public is the Linear webhook path, which is all `deploy/nginx.conf.example` exposes.
+
+## Why there is no language model in here
+
+The bot answers plain language, but it holds no prompt and calls no model. Ranking is Linear's own `semanticSearch`, and the bridge's action space is three verbs: link, relink, unlink.
+
+That is a deliberate choice rather than a shortcut. A model in a chat room is a general-purpose answering machine, and keeping it from answering "what has this person been working on" is a constraint you have to maintain forever. Here no such constraint is needed, because nothing in the code path can produce prose about anyone. The bot ignores every message that does not mention it, and a mention can only ever move a link.
 
 ## Loop prevention
 

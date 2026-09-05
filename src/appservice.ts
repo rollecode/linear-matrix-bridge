@@ -2,12 +2,15 @@ import {
   DERIVED_TITLE_MAX_LENGTH,
   MAX_BACKFILL_MESSAGES,
   MAX_EVENTS_PER_TRANSACTION,
+  MAX_QUERY_LENGTH,
+  MAX_QUERY_MESSAGES,
   MESSAGE_EVENT_TYPE,
   REPLACE_REL_TYPE,
   THREAD_REL_TYPE,
 } from "./constants.js";
 import {
   createLink,
+  deleteLink,
   findLinkByThread,
   isSentEvent,
   recordSentComment,
@@ -18,6 +21,7 @@ import {
 import { isRoomAllowed, type Env } from "./env.js";
 import { LinearClient } from "./linear.js";
 import { htmlToMarkdown, stripReplyFallback } from "./markdown.js";
+import { issueIdentifierIn, looksLikeUnlink, mentionsBot, withoutMention } from "./mention.js";
 import {
   HttpMatrixClient,
   permalink,
@@ -112,6 +116,11 @@ async function handleMessage(bridge: Bridge, event: MatrixEvent): Promise<void> 
   const body = stripReplyFallback(event.content.body ?? "");
   const prefix = bridge.env.COMMAND_PREFIX;
 
+  if (mentionsBot(event.content, bridge.env.MATRIX_BOT_USER_ID)) {
+    await handleMention(bridge, event, body);
+    return;
+  }
+
   if (body === prefix || body.startsWith(`${prefix} `)) {
     await handleCommand(bridge, event, body.slice(prefix.length).trim());
     return;
@@ -152,6 +161,119 @@ async function handleMessage(bridge: Bridge, event: MatrixEvent): Promise<void> 
     await setLinearParentComment(bridge.env.DB, link.thread_root_event_id, commentId);
   }
   await setLastEvent(bridge.env.DB, link.thread_root_event_id, event.event_id);
+}
+
+/**
+ * Plain language, no command needed. Whatever the wording, the only outcomes
+ * are link, relink and unlink, so nothing here can be steered into answering
+ * a question about a person.
+ */
+async function handleMention(bridge: Bridge, event: MatrixEvent, body: string): Promise<void> {
+  const text = withoutMention(body, bridge.env.MATRIX_BOT_USER_ID, bridge.env.MATRIX_BOT_NAME ?? "");
+  const anchor = threadRootOf(event.content["m.relates_to"]) ?? event.event_id;
+  const existing = await findLinkByThread(bridge.env.DB, event.room_id, anchor);
+  console.log(`Mention from ${event.sender} in ${event.room_id}: ${text}`);
+
+  if (looksLikeUnlink(text) && existing) {
+    await deleteLink(bridge.env.DB, event.room_id, anchor);
+    const named = issueIdentifierIn(text);
+
+    if (named && named !== existing.linear_issue_identifier) {
+      await relink(bridge, event, anchor, named);
+      return;
+    }
+
+    await reply(bridge, event.room_id, anchor, `Unlinked from ${existing.linear_issue_identifier}.`);
+    return;
+  }
+
+  const named = issueIdentifierIn(text);
+  if (named) {
+    if (existing?.linear_issue_identifier === named) {
+      await reply(bridge, event.room_id, anchor, `Already linked to ${named}.`);
+      return;
+    }
+    if (existing) {
+      await deleteLink(bridge.env.DB, event.room_id, anchor);
+    }
+    await relink(bridge, event, anchor, named);
+    return;
+  }
+
+  if (existing) {
+    await reply(
+      bridge,
+      event.room_id,
+      anchor,
+      `This thread is linked to ${existing.linear_issue_identifier}. Name another issue to move it, or say unlink.`,
+    );
+    return;
+  }
+
+  await suggestAndLink(bridge, event, anchor);
+}
+
+async function relink(bridge: Bridge, event: MatrixEvent, anchor: string, identifier: string): Promise<void> {
+  const issue = await bridge.linear.findIssueByIdentifier(identifier);
+  if (!issue) {
+    await reply(bridge, event.room_id, anchor, `No issue called ${identifier}.`);
+    return;
+  }
+
+  await createLink(bridge.env.DB, {
+    matrix_room_id: event.room_id,
+    thread_root_event_id: anchor,
+    linear_issue_id: issue.id,
+    linear_issue_identifier: issue.identifier,
+  });
+  await attachThread(bridge, issue.id, event.room_id, anchor);
+  console.log(`Linked ${issue.identifier} to thread ${anchor} in ${event.room_id}`);
+
+  await reply(bridge, event.room_id, anchor, `Linked to **${issue.identifier}** ${issue.title}\n${issue.url}`);
+}
+
+/** Ranking happens inside Linear, so the bridge never holds a prompt of its own. */
+async function suggestAndLink(bridge: Bridge, event: MatrixEvent, anchor: string): Promise<void> {
+  const query = await threadQuery(bridge, event, anchor);
+  const [best, ...rest] = await bridge.linear.suggestIssues(query, 3);
+
+  if (!best) {
+    await reply(bridge, event.room_id, anchor, "Nothing in Linear looks like a match. Name an issue and I will link it.");
+    return;
+  }
+
+  await createLink(bridge.env.DB, {
+    matrix_room_id: event.room_id,
+    thread_root_event_id: anchor,
+    linear_issue_id: best.id,
+    linear_issue_identifier: best.identifier,
+  });
+  await attachThread(bridge, best.id, event.room_id, anchor);
+  console.log(`Suggested and linked ${best.identifier} for thread ${anchor}`);
+
+  const alternatives = rest.length > 0 ? `\n\nOther candidates: ${rest.map((i) => i.identifier).join(", ")}.` : "";
+  await reply(
+    bridge,
+    event.room_id,
+    anchor,
+    `Linked to **${best.identifier}** ${best.title}\n${best.url}${alternatives}\n\nWrong one? Mention me with the right identifier, or say unlink.`,
+  );
+}
+
+async function threadQuery(bridge: Bridge, event: MatrixEvent, anchor: string): Promise<string> {
+  const own = withoutMention(messageText(event), bridge.env.MATRIX_BOT_USER_ID, bridge.env.MATRIX_BOT_NAME ?? "");
+
+  if (anchor === event.event_id) {
+    return own.slice(0, MAX_QUERY_LENGTH);
+  }
+
+  const history = await bridge.matrix.fetchThreadMessages(event.room_id, anchor, MAX_QUERY_MESSAGES);
+  const text = history.messages
+    .filter((message) => message.sender !== bridge.env.MATRIX_BOT_USER_ID && message.event_id !== event.event_id)
+    .map((message) => messageText(message))
+    .join("\n");
+
+  return `${text}\n${own}`.trim().slice(0, MAX_QUERY_LENGTH);
 }
 
 async function handleCommand(bridge: Bridge, event: MatrixEvent, rest: string): Promise<void> {

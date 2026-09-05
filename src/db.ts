@@ -65,6 +65,15 @@ export async function createLink(
   return result.meta.changes > 0;
 }
 
+export async function deleteLink(db: BridgeDatabase, roomId: string, threadRootEventId: string): Promise<boolean> {
+  const result = await db
+    .prepare("DELETE FROM links WHERE matrix_room_id = ? AND thread_root_event_id = ?")
+    .bind(roomId, threadRootEventId)
+    .run();
+
+  return result.meta.changes > 0;
+}
+
 /** The Linear comment every later bridged comment nests under, so one Matrix thread is one Linear thread. */
 export async function setLinearParentComment(
   db: BridgeDatabase,

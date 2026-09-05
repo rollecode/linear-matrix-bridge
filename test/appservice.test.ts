@@ -8,6 +8,7 @@ import {
   seedLink,
   stubFetch,
   testEnv,
+  mentionMessage,
   threadedMessage,
   THREAD_ROOT,
   transactionRequest,
@@ -317,6 +318,52 @@ describe("Matrix appservice transactions", () => {
     expect(input.url).toContain("https://matrix.to/#/");
     expect(input.url).toContain(encodeURIComponent(ROOM_ID));
     expect(input.url).toContain(encodeURIComponent("$cmd-attach"));
+  });
+
+  it("links from plain language when mentioned, with no command", async () => {
+    await SELF.fetch(
+      transactionRequest("txn-nl", [mentionMessage("$nl-1", "can you link this discussion to the right task?")]),
+    );
+
+    const searched = fetchStub.linearCalls.find((c) =>
+      String((c.body as { query: string }).query).includes("semanticSearch"),
+    );
+    expect(searched).toBeDefined();
+
+    const link = await testEnv.DB.prepare("SELECT * FROM links WHERE thread_root_event_id = ?")
+      .bind("$nl-1")
+      .first<{ linear_issue_identifier: string }>();
+    expect(link?.linear_issue_identifier).toBe(ISSUE_IDENTIFIER);
+    expect((fetchStub.matrixSends[0]!.body as { body: string }).body).toContain("MEM-99");
+  });
+
+  it("moves the link when a different issue is named", async () => {
+    await seedLink(null, "$nl-2");
+
+    await SELF.fetch(transactionRequest("txn-nl-move", [mentionMessage("$nl-move", "no, that is MEM-99", "$nl-2")]));
+
+    const link = await testEnv.DB.prepare("SELECT * FROM links WHERE thread_root_event_id = ?")
+      .bind("$nl-2")
+      .first<{ linear_issue_identifier: string }>();
+    expect(link?.linear_issue_identifier).toBe("MEM-42");
+  });
+
+  it("unlinks on a plain-language correction", async () => {
+    await seedLink(null, "$nl-3");
+
+    await SELF.fetch(transactionRequest("txn-nl-unlink", [mentionMessage("$nl-un", "wrong issue, unlink please", "$nl-3")]));
+
+    const link = await testEnv.DB.prepare("SELECT * FROM links WHERE thread_root_event_id = ?").bind("$nl-3").first();
+    expect(link).toBeNull();
+    expect((fetchStub.matrixSends[0]!.body as { body: string }).body).toContain("Unlinked");
+  });
+
+  it("never runs a search for someone who is not mentioning it", async () => {
+    await SELF.fetch(
+      transactionRequest("txn-nomention", [threadedMessage("$chat", "what has rolle been doing lately?")]),
+    );
+
+    expect(fetchStub.linearCalls).toHaveLength(0);
   });
 
   it("links an existing issue to the current thread", async () => {
