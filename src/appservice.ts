@@ -259,8 +259,14 @@ async function relink(bridge: Bridge, event: MatrixEvent, anchor: string, identi
 
 /** Ranking happens inside Linear, so the bridge never holds a prompt of its own. */
 async function suggestAndLink(bridge: Bridge, event: MatrixEvent, anchor: string): Promise<void> {
-  const query = await threadQuery(bridge, event, anchor);
+  const { query, source, readable, unreadable } = await threadQuery(bridge, event, anchor);
   const [best, ...rest] = await bridge.linear.suggestIssues(query, 3);
+
+  // Lengths and counts only: the room's content does not belong in the journal.
+  console.log(
+    `Suggest for ${anchor}: source=${source} readable=${readable} unreadable=${unreadable} ` +
+      `queryChars=${query.length} results=${best ? rest.length + 1 : 0}`,
+  );
 
   if (!best) {
     await reply(bridge, event.room_id, anchor, "Nothing in Linear looks like a match. Name an issue and I will link it.");
@@ -283,22 +289,33 @@ async function suggestAndLink(bridge: Bridge, event: MatrixEvent, anchor: string
  * it measurably pollutes the ranking, so it is used only when there is no
  * thread to read.
  */
-async function threadQuery(bridge: Bridge, event: MatrixEvent, anchor: string): Promise<string> {
+interface ThreadQuery {
+  query: string;
+  source: "thread" | "message";
+  readable: number;
+  unreadable: number;
+}
+
+async function threadQuery(bridge: Bridge, event: MatrixEvent, anchor: string): Promise<ThreadQuery> {
+  let readable = 0;
+  let unreadable = 0;
+
   if (anchor !== event.event_id) {
     const history = await bridge.matrix.fetchThreadMessages(event.room_id, anchor, MAX_QUERY_MESSAGES);
-    const text = history.messages
-      .filter((message) => message.sender !== bridge.env.MATRIX_BOT_USER_ID && message.event_id !== event.event_id)
-      .map((message) => messageText(message))
-      .join("\n")
-      .trim();
+    const usable = history.messages.filter(
+      (message) => message.sender !== bridge.env.MATRIX_BOT_USER_ID && message.event_id !== event.event_id,
+    );
+    readable = usable.length;
+    unreadable = history.unreadable;
 
+    const text = usable.map((message) => messageText(message)).join("\n").trim();
     if (text) {
-      return text.slice(0, MAX_QUERY_LENGTH);
+      return { query: text.slice(0, MAX_QUERY_LENGTH), source: "thread", readable, unreadable };
     }
   }
 
   const own = withoutMention(messageText(event), bridge.env.MATRIX_BOT_USER_ID, bridge.env.MATRIX_BOT_NAME ?? "");
-  return own.slice(0, MAX_QUERY_LENGTH);
+  return { query: own.slice(0, MAX_QUERY_LENGTH), source: "message", readable, unreadable };
 }
 
 async function handleCommand(bridge: Bridge, event: MatrixEvent, rest: string): Promise<void> {

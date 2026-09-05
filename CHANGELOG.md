@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## 1.1.2 - 5.9.2026
+
+- Log why a suggestion found nothing
+
 ## 1.1.1 - 5.9.2026
 
 - Carry thread history across on every link path
