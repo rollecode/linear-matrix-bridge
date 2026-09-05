@@ -19,7 +19,7 @@ A Matrix thread and a Linear issue become one conversation. Replies in the threa
 
 ## On Matrix side
 
-<img width="1060" height="552" alt="image" src="https://github.com/user-attachments/assets/8ae9d867-7fd2-4ae8-83fa-9e776afd1722" />
+<img width="1175" height="498" alt="image" src="https://github.com/user-attachments/assets/40a8d0bc-4459-42c9-8366-358ca49af8e5" />
 
 ## On Linear side
 
