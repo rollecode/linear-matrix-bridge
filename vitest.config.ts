@@ -18,6 +18,7 @@ export default defineConfig({
           MATRIX_ALLOWED_ROOMS: "",
           COMMAND_PREFIX: "!linear",
           LINEAR_TEAM_ID: "team-uuid",
+          GEMINI_API_KEY: "test-gemini-key",
           LINEAR_AUTH_MODE: "api_key",
           MATRIX_AS_TOKEN: "as-token",
           MATRIX_HS_TOKEN: "hs-token",

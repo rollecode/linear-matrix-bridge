@@ -44,6 +44,8 @@ function buildEnv(db: SqliteD1): Env {
     MATRIX_BOT_NAME: process.env.MATRIX_BOT_NAME,
     MATRIX_HOMESERVER_NAME: process.env.MATRIX_HOMESERVER_NAME,
     MATRIX_ICON_URL: process.env.MATRIX_ICON_URL,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    GEMINI_MODEL: process.env.GEMINI_MODEL,
     LINEAR_TEAM_ID: required("LINEAR_TEAM_ID"),
     LINEAR_AUTH_MODE: (process.env.LINEAR_AUTH_MODE ?? "api_key") as LinearAuthMode,
     LINEAR_API_URL: process.env.LINEAR_API_URL,

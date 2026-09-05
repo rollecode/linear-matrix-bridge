@@ -24,6 +24,10 @@ export interface Env {
   /** Icon for the Linear attachment, so the thread shows a Matrix mark under Resources. */
   MATRIX_ICON_URL?: string;
 
+  /** Optional. Without it the thread text goes to Linear unsummarised. */
+  GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
+
   LINEAR_TEAM_ID: string;
   LINEAR_AUTH_MODE: LinearAuthMode;
   LINEAR_API_URL?: string;

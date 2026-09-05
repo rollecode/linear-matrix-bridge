@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 1.2.0 - 5.9.2026
+
+- Condense a thread into an English search phrase
+- Say so when a thread has no searchable topic
+
 ## 1.1.2 - 5.9.2026
 
 - Log why a suggestion found nothing

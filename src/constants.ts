@@ -34,6 +34,10 @@ export const MAX_QUERY_MESSAGES = 20;
 /** Characters of thread text sent to Linear as a search query. */
 export const MAX_QUERY_LENGTH = 1000;
 
+export const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
+export const GEMINI_DEFAULT_MODEL = "gemini-3.6-flash";
+export const CONDENSE_TIMEOUT_MS = 10_000;
+
 export const MATRIX_TO_BASE = "https://matrix.to/#";
 
 /** Longest title we will lift out of a replied-to message when `!linear` is used without one. */

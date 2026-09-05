@@ -23,6 +23,9 @@ export interface FetchStub {
   linearCalls: RecordedRequest[];
   /** What `GET /event/{eventId}` resolves to, for the reply-to-a-message flow. */
   quotedEvent: unknown;
+  /** What the condensing model returns. */
+  condensedPhrase: string;
+  condenseCalls: RecordedRequest[];
   /** Whether the room reports m.room.encryption state. */
   roomEncrypted: boolean;
   /** What the thread relations endpoint returns, newest first as Synapse does. */
@@ -34,7 +37,7 @@ export interface FetchStub {
  * Matrix sends resolve to a fixed event ID; Linear mutations resolve to canned data.
  */
 export function stubFetch(): FetchStub {
-  const stub: FetchStub = { requests: [], matrixSends: [], linearCalls: [], quotedEvent: null, roomEncrypted: false, threadRelations: [] };
+  const stub: FetchStub = { requests: [], matrixSends: [], linearCalls: [], quotedEvent: null, roomEncrypted: false, threadRelations: [], condensedPhrase: "server disk space is full", condenseCalls: [] };
   commentCounter = 0;
 
   vi.stubGlobal(
@@ -68,6 +71,11 @@ export function stubFetch(): FetchStub {
 
       if (url.includes("/_matrix/client/v3/profile/")) {
         return Response.json({ displayname: "Test User" });
+      }
+
+      if (url.includes("generativelanguage.googleapis.com")) {
+        stub.condenseCalls.push(recorded);
+        return Response.json({ candidates: [{ content: { parts: [{ text: stub.condensedPhrase }] } }] });
       }
 
       if (url.includes("api.linear.app")) {

@@ -6,7 +6,7 @@
 <img style="justify-content:center;text-align: center;width: 180px; height: auto;"  width="1600" height="400" alt="Linear" src="https://github.com/user-attachments/assets/8c2d5756-0e3f-432a-8a3d-1d0e8293539a" /> &nbsp; <img style="justify-content:center;text-align: center;width: 100px; height: auto;" width="1920" height="820" alt="Matrix" src="https://github.com/user-attachments/assets/8685c940-eb6d-4417-8300-6979c0ce3821" />
 
 
-![Version](https://img.shields.io/badge/version-1.1.2-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
+![Version](https://img.shields.io/badge/version-1.2.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
 
 </div>
 </center>
@@ -77,6 +77,8 @@ Set the non-secret values in the `vars` block of `wrangler.jsonc`:
 | `LINEAR_TEAM_ID` | UUID of the team that `!linear <title>` creates issues in. |
 | `LINEAR_AUTH_MODE` | `oauth` or `api_key`. See below. |
 | `COMMAND_PREFIX` | Defaults to `!linear`. |
+| `GEMINI_API_KEY` | Optional. Condenses a thread into a search phrase. Without it the raw thread text is searched. |
+| `GEMINI_MODEL` | Defaults to `gemini-3.6-flash`. |
 | `MATRIX_BOT_NAME` | Display name, stripped from a mention before it becomes a search query. |
 | `MATRIX_HOMESERVER_NAME` | Subtitle on the Linear attachment. Falls back to the room ID. |
 | `MATRIX_ICON_URL` | Publicly reachable icon for that attachment. `public/matrix-icon.png` ships with the repo and the example vhost serves it. |
@@ -134,6 +136,7 @@ Configuration comes from the environment rather than `wrangler.jsonc`. Put the f
 MATRIX_HOMESERVER_URL=https://matrix.example.org
 MATRIX_BOT_USER_ID=@linear:example.org
 MATRIX_ALLOWED_ROOMS=
+GEMINI_API_KEY=
 MATRIX_BOT_NAME=Linear
 MATRIX_HOMESERVER_NAME=example.org
 MATRIX_ICON_URL=https://linear.example.org/matrix-icon.png
@@ -160,11 +163,21 @@ Migrations apply themselves at startup, tracked in a `d1_migrations` table, so t
 
 The bridge binds to localhost. Synapse reaches it there, so the only thing that has to be public is the Linear webhook path, which is all `deploy/nginx.conf.example` exposes.
 
-## Why there is no language model in here
+## The one place a model is used
 
-The bot answers plain language, but it holds no prompt and calls no model. Ranking is Linear's own `semanticSearch`, and the bridge's action space is three verbs: link, relink, unlink.
+Linear's `semanticSearch` matches a query against issue text, and a chat thread is not a query. Twenty messages about three subjects average out to nothing in particular, and its ranking is markedly better in English than in other languages. Measured on a real workspace, the same request phrased in Finnish returned the wrong issue and in English the right one.
 
-That is a deliberate choice rather than a shortcut. A model in a chat room is a general-purpose answering machine, and keeping it from answering "what has this person been working on" is a constraint you have to maintain forever. Here no such constraint is needed, because nothing in the code path can produce prose about anyone. The bot ignores every message that does not mention it, and a mention can only ever move a link.
+So one narrow call sits in front of the search: thread text in, a short English search phrase out. That phrase goes to Linear.
+
+The model has no other role. It never sees the issue list, never writes into the room, never answers a question, and cannot reach the bridge's replies. It shapes a search string, and that is the whole of it. Set `GEMINI_API_KEY` to enable it; without a key the raw thread text is used instead, which works for short single-topic threads and poorly for long ones.
+
+**This does send the thread's text to Google.** That is a second recipient beyond Linear, which already stores the same text as comments. If a thread is too sensitive for that, do not ask the bot to find its issue; name the issue instead and no model is called.
+
+## Why the rest of it has no model
+
+Beyond that one call, the bot answers plain language without a model. Intent is a pattern match over three verbs: link, relink, unlink.
+
+That is deliberate. A model wired to a room's output is a general-purpose answering machine, and keeping it from answering "what has this person been working on" is a constraint you maintain forever. No such constraint is needed here, because nothing in the code path can turn a model's output into prose in the room. The bot ignores every message that does not mention it, and a mention can only ever move a link.
 
 ## Loop prevention
 

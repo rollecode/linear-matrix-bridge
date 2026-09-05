@@ -382,13 +382,10 @@ describe("Matrix appservice transactions", () => {
       ]),
     );
 
-    const searched = fetchStub.linearCalls.find((c) =>
-      String((c.body as { query: string }).query).includes("semanticSearch"),
-    );
-    const term = (searched!.body as { variables: { query: string } }).variables.query;
+    const sentToModel = JSON.stringify(fetchStub.condenseCalls[0]!.body);
 
-    expect(term).toContain("deploy keeps timing out");
-    expect(term).not.toContain("I forget what this was about");
+    expect(sentToModel).toContain("deploy keeps timing out");
+    expect(sentToModel).not.toContain("I forget what this was about");
   });
 
   it("carries the earlier conversation across when the bot picks the issue itself", async () => {
@@ -443,6 +440,49 @@ describe("Matrix appservice transactions", () => {
 
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toContain("certificate expired overnight");
+  });
+
+  it("searches on the condensed topic rather than the raw thread", async () => {
+    fetchStub.condensedPhrase = "migrate the Matrix server";
+    fetchStub.quotedEvent = {
+      type: "m.room.message",
+      event_id: "$ramble-root",
+      room_id: ROOM_ID,
+      sender: "@robin:matrix.test",
+      content: { msgtype: "m.text", body: "moi mitas kuuluu, saa on hyva, pitais kattoo se palvelin joskus" },
+    };
+    fetchStub.threadRelations = [];
+
+    await SELF.fetch(transactionRequest("txn-cond", [mentionMessage("$ask-c", "linkkaatko taman", "$ramble-root")]));
+
+    expect(fetchStub.condenseCalls).toHaveLength(1);
+    const sentToModel = JSON.stringify(fetchStub.condenseCalls[0]!.body);
+    expect(sentToModel).toContain("pitais kattoo se palvelin");
+
+    const searched = fetchStub.linearCalls.find((c) =>
+      String((c.body as { query: string }).query).includes("semanticSearch"),
+    );
+    expect((searched!.body as { variables: { query: string } }).variables.query).toBe("migrate the Matrix server");
+  });
+
+  it("says so when the thread has no topic worth searching", async () => {
+    fetchStub.condensedPhrase = "NONE";
+    fetchStub.quotedEvent = {
+      type: "m.room.message",
+      event_id: "$smalltalk",
+      room_id: ROOM_ID,
+      sender: "@robin:matrix.test",
+      content: { msgtype: "m.text", body: "moi, hyvaa viikonloppua" },
+    };
+    fetchStub.threadRelations = [];
+
+    await SELF.fetch(transactionRequest("txn-none", [mentionMessage("$ask-n2", "linkkaa tama", "$smalltalk")]));
+
+    const searched = fetchStub.linearCalls.find((c) =>
+      String((c.body as { query: string }).query).includes("semanticSearch"),
+    );
+    expect(searched).toBeUndefined();
+    expect((fetchStub.matrixSends[0]!.body as { body: string }).body).toContain("cannot tell what this thread is about");
   });
 
   it("links an existing issue to the current thread", async () => {

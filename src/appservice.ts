@@ -18,6 +18,7 @@ import {
   setLastEvent,
   setLinearParentComment,
 } from "./db.js";
+import { condenseThread, NO_TOPIC } from "./condense.js";
 import { isRoomAllowed, type Env } from "./env.js";
 import { LinearClient, type LinearIssue } from "./linear.js";
 import { htmlToMarkdown, stripReplyFallback } from "./markdown.js";
@@ -260,16 +261,30 @@ async function relink(bridge: Bridge, event: MatrixEvent, anchor: string, identi
 /** Ranking happens inside Linear, so the bridge never holds a prompt of its own. */
 async function suggestAndLink(bridge: Bridge, event: MatrixEvent, anchor: string): Promise<void> {
   const { query, source, readable, unreadable } = await threadQuery(bridge, event, anchor);
-  const [best, ...rest] = await bridge.linear.suggestIssues(query, 3);
+  const condensed = await condenseThread(bridge.env, query);
+
+  if (condensed === NO_TOPIC) {
+    await reply(bridge, event.room_id, anchor, "I cannot tell what this thread is about. Name an issue and I will link it.");
+    return;
+  }
+
+  const term = condensed ?? query;
+  const [best, ...rest] = await bridge.linear.suggestIssues(term, 3);
 
   // Lengths and counts only: the room's content does not belong in the journal.
   console.log(
     `Suggest for ${anchor}: source=${source} readable=${readable} unreadable=${unreadable} ` +
-      `queryChars=${query.length} results=${best ? rest.length + 1 : 0}`,
+      `queryChars=${query.length} condensed=${condensed !== null} termChars=${term.length} ` +
+      `results=${best ? rest.length + 1 : 0}`,
   );
 
   if (!best) {
-    await reply(bridge, event.room_id, anchor, "Nothing in Linear looks like a match. Name an issue and I will link it.");
+    await reply(
+      bridge,
+      event.room_id,
+      anchor,
+      `Nothing in Linear matches "${term}". Name an issue and I will link it.`,
+    );
     return;
   }
 
