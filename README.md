@@ -6,7 +6,7 @@
 <img style="justify-content:center;text-align: center;width: 180px; height: auto;"  width="1600" height="400" alt="Linear" src="https://github.com/user-attachments/assets/8c2d5756-0e3f-432a-8a3d-1d0e8293539a" /> &nbsp; <img style="justify-content:center;text-align: center;width: 100px; height: auto;" width="1920" height="820" alt="Matrix" src="https://github.com/user-attachments/assets/8685c940-eb6d-4417-8300-6979c0ce3821" />
 
 
-![Version](https://img.shields.io/badge/version-0.6.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
+![Version](https://img.shields.io/badge/version-0.7.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
 
 </div>
 </center>
@@ -23,7 +23,7 @@ A Matrix thread and a Linear issue become one conversation. Replies in the threa
 | --- | --- |
 | `!linear Fix the login bug` | Creates an issue in the configured team. The bot replies in a thread with the identifier and URL, and that thread is now mapped to the issue. |
 | `!linear` as a reply to a message | Uses the replied-to message as the description and as the thread anchor. Without a title, the first line of that message becomes the title. |
-| `!linear link MEM-42` | Maps the current thread to an issue that already exists. Several threads, in different rooms, can point at the same issue. |
+| `!linear link MEM-42` | Maps the current thread to an issue that already exists, and copies what was already said in it onto the issue. Several threads, in different rooms, can point at the same issue. |
 | Any message in a mapped thread | Becomes a comment on the issue, nested under the first one so the Matrix thread stays one Linear comment thread. |
 | Being invited to a room | The bot joins, as long as the room passes `MATRIX_ALLOWED_ROOMS`. In an encrypted room it says it cannot read anything there. |
 
@@ -31,6 +31,8 @@ A Matrix thread and a Linear issue become one conversation. Replies in the threa
 | --- | --- |
 | A comment on a mapped issue | Posted into every thread linked to that issue, with the Linear author's name. |
 | An issue state change | A one-line note in every linked thread. State changes only, not every field update. |
+
+Every linked thread is also added to the issue as an attachment, so it appears under **Resources** with a Matrix icon alongside any Slack or GitHub links.
 
 ## Where it runs
 
@@ -65,6 +67,8 @@ Set the non-secret values in the `vars` block of `wrangler.jsonc`:
 | `LINEAR_TEAM_ID` | UUID of the team that `!linear <title>` creates issues in. |
 | `LINEAR_AUTH_MODE` | `oauth` or `api_key`. See below. |
 | `COMMAND_PREFIX` | Defaults to `!linear`. |
+| `MATRIX_HOMESERVER_NAME` | Subtitle on the Linear attachment. Falls back to the room ID. |
+| `MATRIX_ICON_URL` | Publicly reachable icon for that attachment. |
 
 Then the four secrets, which never belong in `wrangler.jsonc`:
 
@@ -166,7 +170,7 @@ Deliberate omissions, not oversights:
 - **Message edits** (`m.replace`) are ignored. Bridging them would post a duplicate comment.
 - **Redactions** are ignored. Deleting the matching Linear comment on the strength of a Matrix redaction is not a trade the bridge makes on its own.
 - **Attachments** are noted, not transferred. `mxc://` needs authenticated media access, so the comment records that a file was attached and names it.
-- **Messages posted in a thread before it was mapped** are not backfilled. `!linear link` says so in its reply.
+- **Messages encrypted before the bridge had the room key** cannot be backfilled. `!linear link` copies the thread's history onto the issue, but anything it cannot decrypt is counted in the reply rather than silently skipped.
 - **Comment edits and deletions in Linear** do not propagate back to Matrix.
 - **Matrix messages are not mirrored between threads.** A message typed in one linked thread becomes a Linear comment, but is not copied into the other threads on that issue. Linked threads can live in rooms with different membership, and cross-posting between them would move content across those boundaries. Linear is the shared surface; comments written there reach every thread.
 - Markdown and HTML conversion covers what chat messages actually use: bold, italic, strikethrough, inline code, code blocks, links, lists and quotes. It is not a full CommonMark implementation.

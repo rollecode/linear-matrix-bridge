@@ -25,5 +25,10 @@ export const WEBHOOK_MAX_CLOCK_SKEW_MS = 60_000;
 
 export const LINEAR_API_URL = "https://api.linear.app/graphql";
 
+/** Cap on messages pulled into Linear when an existing thread is linked. */
+export const MAX_BACKFILL_MESSAGES = 50;
+
+export const MATRIX_TO_BASE = "https://matrix.to/#";
+
 /** Longest title we will lift out of a replied-to message when `!linear` is used without one. */
 export const DERIVED_TITLE_MAX_LENGTH = 120;

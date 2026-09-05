@@ -20,6 +20,10 @@ const CREATE_COMMENT = `mutation CreateComment($input: CommentCreateInput!) {
   commentCreate(input: $input) { success comment { id } }
 }`;
 
+const CREATE_ATTACHMENT = `mutation CreateAttachment($input: AttachmentCreateInput!) {
+  attachmentCreate(input: $input) { success attachment { id } }
+}`;
+
 const FIND_ISSUE = `query FindIssue($teamKey: String!, $number: Float!) {
   issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }, first: 1) {
     nodes { ${ISSUE_FIELDS} }
@@ -102,6 +106,19 @@ export class LinearClient {
     }
 
     return data.commentCreate.comment.id;
+  }
+
+  /** Shows up under Resources on the issue, the way the Slack integration's links do. */
+  async createAttachment(
+    issueId: string,
+    url: string,
+    title: string,
+    subtitle: string,
+    iconUrl?: string,
+  ): Promise<void> {
+    await this.graphql<{ attachmentCreate: { success: boolean } }>(CREATE_ATTACHMENT, {
+      input: { issueId, url, title, subtitle, iconUrl },
+    });
   }
 
   async findIssueByIdentifier(identifier: string): Promise<LinearIssue | null> {

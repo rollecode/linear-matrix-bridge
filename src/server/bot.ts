@@ -6,7 +6,13 @@ import {
 } from "matrix-bot-sdk";
 import { handleTransaction } from "../appservice.js";
 import type { Env } from "../env.js";
-import { noticeContent, threadedContent, type MatrixEvent, type MatrixGateway } from "../matrix.js";
+import {
+  noticeContent,
+  threadedContent,
+  type MatrixEvent,
+  type MatrixGateway,
+  type ThreadHistory,
+} from "../matrix.js";
 
 /**
  * `RustSdkCryptoStoreType.Sqlite`, inlined because it is an ambient const enum
@@ -71,6 +77,36 @@ export class BotMatrixGateway implements MatrixGateway {
 
   async sendNotice(roomId: string, markdown: string): Promise<string> {
     return this.client.sendMessage(roomId, noticeContent(markdown));
+  }
+
+  /**
+   * Fetched by ID rather than straight from the relations chunk, because
+   * `getEvent` is the path that decrypts. Anything sent before this device had
+   * the room key stays unreadable and is only counted.
+   */
+  async fetchThreadMessages(roomId: string, threadRootEventId: string, limit: number): Promise<ThreadHistory> {
+    const related = (await this.client.doRequest(
+      "GET",
+      `/_matrix/client/v1/rooms/${encodeURIComponent(roomId)}/relations/${encodeURIComponent(threadRootEventId)}/m.thread`,
+      { limit },
+    )) as { chunk: { event_id: string }[] };
+
+    const ids = [threadRootEventId, ...[...related.chunk].reverse().map((event) => event.event_id)];
+    const messages: MatrixEvent[] = [];
+    let unreadable = 0;
+
+    for (const id of ids) {
+      try {
+        const event = (await this.client.getEvent(roomId, id)) as MatrixEvent;
+        if (event.type === "m.room.message") {
+          messages.push({ ...event, room_id: roomId });
+        }
+      } catch {
+        unreadable++;
+      }
+    }
+
+    return { messages, unreadable };
   }
 }
 

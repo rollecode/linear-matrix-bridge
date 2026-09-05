@@ -20,6 +20,12 @@ server {
         client_max_body_size 2M;
     }
 
+    # Linear fetches this for the attachment icon under Resources.
+    location = /matrix-icon.png {
+        alias /opt/linear-matrix-bridge/public/matrix-icon.png;
+        expires 30d;
+    }
+
     location = /health {
         proxy_pass http://127.0.0.1:5055;
         proxy_set_header Host $host;

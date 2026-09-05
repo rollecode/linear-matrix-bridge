@@ -25,6 +25,8 @@ export interface FetchStub {
   quotedEvent: unknown;
   /** Whether the room reports m.room.encryption state. */
   roomEncrypted: boolean;
+  /** What the thread relations endpoint returns, newest first as Synapse does. */
+  threadRelations: unknown[];
 }
 
 /**
@@ -32,7 +34,8 @@ export interface FetchStub {
  * Matrix sends resolve to a fixed event ID; Linear mutations resolve to canned data.
  */
 export function stubFetch(): FetchStub {
-  const stub: FetchStub = { requests: [], matrixSends: [], linearCalls: [], quotedEvent: null, roomEncrypted: false };
+  const stub: FetchStub = { requests: [], matrixSends: [], linearCalls: [], quotedEvent: null, roomEncrypted: false, threadRelations: [] };
+  commentCounter = 0;
 
   vi.stubGlobal(
     "fetch",
@@ -47,6 +50,10 @@ export function stubFetch(): FetchStub {
       if (url.includes("/_matrix/client/v3/rooms/") && url.includes("/send/")) {
         stub.matrixSends.push(recorded);
         return Response.json({ event_id: SENT_EVENT_ID });
+      }
+
+      if (url.includes("/relations/")) {
+        return Response.json({ chunk: stub.threadRelations });
       }
 
       if (url.includes("/state/m.room.encryption")) {
@@ -75,6 +82,8 @@ export function stubFetch(): FetchStub {
   return stub;
 }
 
+let commentCounter = 0;
+
 function linearResponse(query: string): unknown {
   if (query.includes("issueCreate")) {
     return {
@@ -91,7 +100,11 @@ function linearResponse(query: string): unknown {
   }
 
   if (query.includes("commentCreate")) {
-    return { commentCreate: { success: true, comment: { id: "comment-uuid" } } };
+    return { commentCreate: { success: true, comment: { id: `comment-${commentCounter++}` } } };
+  }
+
+  if (query.includes("attachmentCreate")) {
+    return { attachmentCreate: { success: true, attachment: { id: "attachment-uuid" } } };
   }
 
   return {

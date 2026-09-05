@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 0.7.0 - 5.9.2026
+
+- Copy existing thread history onto the issue on link
+- Add the Matrix thread under Linear Resources
+
 ## 0.6.0 - 5.9.2026
 
 - Many Matrix threads can link to one issue

@@ -41,6 +41,8 @@ function buildEnv(db: SqliteD1): Env {
     MATRIX_BOT_USER_ID: required("MATRIX_BOT_USER_ID"),
     MATRIX_ALLOWED_ROOMS: process.env.MATRIX_ALLOWED_ROOMS ?? "",
     COMMAND_PREFIX: process.env.COMMAND_PREFIX ?? "!linear",
+    MATRIX_HOMESERVER_NAME: process.env.MATRIX_HOMESERVER_NAME,
+    MATRIX_ICON_URL: process.env.MATRIX_ICON_URL,
     LINEAR_TEAM_ID: required("LINEAR_TEAM_ID"),
     LINEAR_AUTH_MODE: (process.env.LINEAR_AUTH_MODE ?? "api_key") as LinearAuthMode,
     LINEAR_API_URL: process.env.LINEAR_API_URL,

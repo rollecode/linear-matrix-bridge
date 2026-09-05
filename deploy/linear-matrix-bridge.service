@@ -20,6 +20,8 @@ Environment=DATABASE_PATH=/opt/linear-matrix-bridge/data/bridge.db
 Environment=MIGRATIONS_DIR=/opt/linear-matrix-bridge/migrations
 Environment=BOT_STORAGE_PATH=/opt/linear-matrix-bridge/data/bot.json
 Environment=CRYPTO_STORAGE_PATH=/opt/linear-matrix-bridge/data/crypto
+Environment=MATRIX_HOMESERVER_NAME=chat.mementomori.social
+Environment=MATRIX_ICON_URL=https://linear.chat.mementomori.social/matrix-icon.png
 
 # Tokens live here, mode 600, never in the unit and never in git.
 EnvironmentFile=/opt/linear-matrix-bridge/.env

@@ -1,5 +1,6 @@
 import {
   DERIVED_TITLE_MAX_LENGTH,
+  MAX_BACKFILL_MESSAGES,
   MAX_EVENTS_PER_TRANSACTION,
   MESSAGE_EVENT_TYPE,
   REPLACE_REL_TYPE,
@@ -17,7 +18,13 @@ import {
 import { isRoomAllowed, type Env } from "./env.js";
 import { LinearClient } from "./linear.js";
 import { htmlToMarkdown, stripReplyFallback } from "./markdown.js";
-import { HttpMatrixClient, type MatrixEvent, type MatrixGateway, type MatrixRelatesTo } from "./matrix.js";
+import {
+  HttpMatrixClient,
+  permalink,
+  type MatrixEvent,
+  type MatrixGateway,
+  type MatrixRelatesTo,
+} from "./matrix.js";
 
 const TEXT_MSGTYPES = new Set(["m.text", "m.notice", "m.emote"]);
 const LINK_SUBCOMMAND = "link";
@@ -200,12 +207,92 @@ async function linkExistingIssue(
   }
 
   console.log(`Linked ${issue.identifier} to thread ${anchor} in ${event.room_id}`);
+  await attachThread(bridge, issue.id, event.room_id, anchor);
+
+  const carried = threadRootEventId
+    ? await backfillThread(bridge, issue.id, issue.identifier, event, anchor)
+    : { bridged: 0, unreadable: 0 };
+
   await reply(
     bridge,
     event.room_id,
     anchor,
-    `Linked to **${issue.identifier}** ${issue.title}\n${issue.url}\n\nMessages posted in this thread from now on become comments. Anything said before the link is not bridged.`,
+    `Linked to **${issue.identifier}** ${issue.title}\n${issue.url}${backfillNote(carried)}`,
   );
+}
+
+function backfillNote(carried: { bridged: number; unreadable: number }): string {
+  if (carried.bridged === 0 && carried.unreadable === 0) {
+    return "\n\nMessages posted in this thread from now on become comments.";
+  }
+
+  const unreadable =
+    carried.unreadable > 0
+      ? ` ${carried.unreadable} older ${carried.unreadable === 1 ? "message" : "messages"} could not be read, because they were encrypted before the bridge joined.`
+      : "";
+
+  return `\n\nCopied ${carried.bridged} earlier ${carried.bridged === 1 ? "message" : "messages"} across.${unreadable}`;
+}
+
+/** Puts the thread under Resources on the issue, next to any Slack or GitHub links. */
+async function attachThread(bridge: Bridge, issueId: string, roomId: string, threadRootEventId: string): Promise<void> {
+  try {
+    await bridge.linear.createAttachment(
+      issueId,
+      permalink(roomId, threadRootEventId),
+      "Matrix thread",
+      bridge.env.MATRIX_HOMESERVER_NAME || roomId,
+      bridge.env.MATRIX_ICON_URL,
+    );
+  } catch (error) {
+    console.error(`Could not attach the Matrix thread to ${issueId}`, error);
+  }
+}
+
+/**
+ * Copies what was already said in the thread onto the issue, so linking an
+ * existing conversation does not produce an empty comment section.
+ */
+async function backfillThread(
+  bridge: Bridge,
+  issueId: string,
+  identifier: string,
+  command: MatrixEvent,
+  threadRootEventId: string,
+): Promise<{ bridged: number; unreadable: number }> {
+  const history = await bridge.matrix.fetchThreadMessages(command.room_id, threadRootEventId, MAX_BACKFILL_MESSAGES);
+  let parentId: string | null = null;
+  let bridged = 0;
+
+  for (const message of history.messages) {
+    if (message.sender === bridge.env.MATRIX_BOT_USER_ID || message.event_id === command.event_id) {
+      continue;
+    }
+
+    const text = messageText(message);
+    if (!text || text.startsWith(bridge.env.COMMAND_PREFIX)) {
+      continue;
+    }
+
+    const authorName = await bridge.matrix.getDisplayName(message.sender);
+    const commentId = await bridge.linear.createComment(
+      issueId,
+      bridge.linear.attributesToApp ? text : `**${authorName}** on Matrix:\n\n${text}`,
+      authorName,
+      parentId,
+    );
+
+    await recordSentComment(bridge.env.DB, commentId);
+    parentId ??= commentId;
+    bridged++;
+  }
+
+  if (parentId) {
+    await setLinearParentComment(bridge.env.DB, threadRootEventId, parentId);
+  }
+
+  console.log(`Backfilled ${bridged} messages into ${identifier}, ${history.unreadable} unreadable`);
+  return { bridged, unreadable: history.unreadable };
 }
 
 async function createIssueFromCommand(
@@ -245,6 +332,9 @@ async function createIssueFromCommand(
   });
 
   console.log(`Created ${issue.identifier} from ${event.room_id}, thread ${anchor}, linked=${linked}`);
+  if (linked) {
+    await attachThread(bridge, issue.id, event.room_id, anchor);
+  }
   const note = linked ? "" : "\n\nThis thread was already linked, so the new issue is not bridged to it.";
   await reply(bridge, event.room_id, anchor, `Created **${issue.identifier}** ${issue.title}\n${issue.url}${note}`);
 }

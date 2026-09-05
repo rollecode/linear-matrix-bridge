@@ -72,7 +72,7 @@ describe("Matrix appservice transactions", () => {
 
     expect(comments).toHaveLength(2);
     expect(comments[0]!.parentId).toBeUndefined();
-    expect(comments[1]!.parentId).toBe("comment-uuid");
+    expect(comments[1]!.parentId).toBe("comment-0");
   });
 
   it("joins a room when invited, and ignores invites meant for other users", async () => {
@@ -252,6 +252,71 @@ describe("Matrix appservice transactions", () => {
     );
     expect(comments).toHaveLength(1);
     expect((comments[0]!.body as { variables: { input: { body: string } } }).variables.input.body).toContain("second");
+  });
+
+  it("copies what was already said in the thread onto the issue", async () => {
+    const root = "$existing-root";
+    fetchStub.quotedEvent = {
+      type: "m.room.message",
+      event_id: root,
+      room_id: ROOM_ID,
+      sender: "@robin:matrix.test",
+      content: { msgtype: "m.text", body: "The login page 500s" },
+    };
+    fetchStub.threadRelations = [
+      {
+        type: "m.room.message",
+        event_id: "$older-2",
+        room_id: ROOM_ID,
+        sender: "@sam:matrix.test",
+        content: { msgtype: "m.text", body: "Still broken on staging" },
+      },
+    ];
+
+    const command = {
+      type: "m.room.message",
+      event_id: "$cmd-backfill",
+      room_id: ROOM_ID,
+      sender: "@sam:matrix.test",
+      content: {
+        msgtype: "m.text",
+        body: `!linear link ${ISSUE_IDENTIFIER}`,
+        "m.relates_to": { rel_type: "m.thread", event_id: root, is_falling_back: true },
+      },
+    };
+
+    await SELF.fetch(transactionRequest("txn-backfill", [command]));
+
+    const bodies = fetchStub.linearCalls
+      .filter((c) => String((c.body as { query: string }).query).includes("commentCreate"))
+      .map((c) => (c.body as { variables: { input: { body: string; parentId?: string } } }).variables.input);
+
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0]!.body).toContain("The login page 500s");
+    expect(bodies[1]!.body).toContain("Still broken on staging");
+    expect(bodies[1]!.parentId).toBe("comment-0");
+  });
+
+  it("attaches the Matrix thread to the issue for the Resources section", async () => {
+    const command = {
+      type: "m.room.message",
+      event_id: "$cmd-attach",
+      room_id: ROOM_ID,
+      sender: "@sam:matrix.test",
+      content: { msgtype: "m.text", body: `!linear link ${ISSUE_IDENTIFIER}` },
+    };
+
+    await SELF.fetch(transactionRequest("txn-attach", [command]));
+
+    const attach = fetchStub.linearCalls.find((c) =>
+      String((c.body as { query: string }).query).includes("attachmentCreate"),
+    );
+    const input = (attach!.body as { variables: { input: { url: string; title: string } } }).variables.input;
+
+    expect(input.title).toBe("Matrix thread");
+    expect(input.url).toContain("https://matrix.to/#/");
+    expect(input.url).toContain(encodeURIComponent(ROOM_ID));
+    expect(input.url).toContain(encodeURIComponent("$cmd-attach"));
   });
 
   it("links an existing issue to the current thread", async () => {

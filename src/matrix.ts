@@ -1,4 +1,4 @@
-import { HTML_FORMAT, MESSAGE_EVENT_TYPE, THREAD_REL_TYPE } from "./constants.js";
+import { HTML_FORMAT, MATRIX_TO_BASE, MESSAGE_EVENT_TYPE, THREAD_REL_TYPE } from "./constants.js";
 import type { Env } from "./env.js";
 import { markdownToHtml } from "./markdown.js";
 
@@ -39,6 +39,21 @@ export interface MatrixGateway {
   joinRoom(roomId: string): Promise<void>;
   isRoomEncrypted(roomId: string): Promise<boolean>;
   sendNotice(roomId: string, markdown: string): Promise<string>;
+  /** Existing messages in a thread, oldest first, decrypted where the transport can. */
+  fetchThreadMessages(roomId: string, threadRootEventId: string, limit: number): Promise<ThreadHistory>;
+}
+
+export interface ThreadHistory {
+  messages: MatrixEvent[];
+  /** Events that exist but could not be read, so the count can be reported rather than hidden. */
+  unreadable: number;
+}
+
+/** matrix.to permalink, percent-encoded as the spec appendix requires. */
+export function permalink(roomId: string, eventId: string): string {
+  const via = roomId.split(":")[1] ?? "";
+
+  return `${MATRIX_TO_BASE}/${encodeURIComponent(roomId)}/${encodeURIComponent(eventId)}?via=${encodeURIComponent(via)}`;
 }
 
 /**
@@ -130,6 +145,20 @@ export class HttpMatrixClient implements MatrixGateway {
     const sent = await this.request<{ event_id: string }>("PUT", path, content);
 
     return sent.event_id;
+  }
+
+  /** Without a crypto device this can only read what was never encrypted. */
+  async fetchThreadMessages(roomId: string, threadRootEventId: string, limit: number): Promise<ThreadHistory> {
+    const path =
+      `/_matrix/client/v1/rooms/${encodeURIComponent(roomId)}/relations/` +
+      `${encodeURIComponent(threadRootEventId)}/${THREAD_REL_TYPE}?limit=${limit}`;
+    const related = await this.request<{ chunk: MatrixEvent[] }>("GET", path);
+    const root = await this.getEvent(roomId, threadRootEventId);
+
+    const ordered = [root, ...[...related.chunk].reverse()];
+    const messages = ordered.filter((event) => event.type === MESSAGE_EVENT_TYPE);
+
+    return { messages, unreadable: ordered.length - messages.length };
   }
 
   /** Falls back to the localpart, which is better in a Linear comment than an empty string. */
