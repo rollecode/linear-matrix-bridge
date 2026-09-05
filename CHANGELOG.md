@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## 0.5.1 - 5.9.2026
+
+- Log commands, links and bridged comments
+
 ## 0.5.0 - 30.8.2026
 
 - Read and write end-to-end encrypted rooms on the server deployment

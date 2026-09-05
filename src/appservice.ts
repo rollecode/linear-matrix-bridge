@@ -135,6 +135,8 @@ async function handleMessage(bridge: Bridge, event: MatrixEvent): Promise<void> 
     link.linear_parent_comment_id,
   );
 
+  console.log(`Bridged a message from ${event.sender} to ${link.linear_issue_identifier} as comment ${commentId}`);
+
   // Linear will webhook this comment straight back at us; remember it so we drop it.
   await recordSentComment(bridge.env.DB, commentId);
 
@@ -146,6 +148,7 @@ async function handleMessage(bridge: Bridge, event: MatrixEvent): Promise<void> 
 }
 
 async function handleCommand(bridge: Bridge, event: MatrixEvent, rest: string): Promise<void> {
+  console.log(`Command from ${event.sender} in ${event.room_id}: ${bridge.env.COMMAND_PREFIX} ${rest}`);
   const relatesTo = event.content["m.relates_to"];
   const threadRootEventId = threadRootOf(relatesTo);
 
@@ -196,6 +199,7 @@ async function linkExistingIssue(
     return;
   }
 
+  console.log(`Linked ${issue.identifier} to thread ${anchor} in ${event.room_id}`);
   await reply(
     bridge,
     event.room_id,
@@ -240,6 +244,7 @@ async function createIssueFromCommand(
     linear_issue_identifier: issue.identifier,
   });
 
+  console.log(`Created ${issue.identifier} from ${event.room_id}, thread ${anchor}, linked=${linked}`);
   const note = linked ? "" : "\n\nThat thread was already linked, so this issue is not bridged.";
   await reply(bridge, event.room_id, anchor, `Created **${issue.identifier}** ${issue.title}\n${issue.url}${note}`);
 }
