@@ -17,6 +17,14 @@ A Matrix thread and a Linear issue become one conversation. Replies in the threa
 
 <hr>
 
+## On Matrix side
+
+<img width="1060" height="552" alt="image" src="https://github.com/user-attachments/assets/8ae9d867-7fd2-4ae8-83fa-9e776afd1722" />
+
+## On Linear side
+
+<img width="772" height="572" alt="image" src="https://github.com/user-attachments/assets/ffc38403-0d7f-4a5c-a16f-c67fe166948c" />
+
 ## How it behaves
 
 | In Matrix | What happens |
