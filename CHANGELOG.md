@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 1.0.0 - 5.9.2026
+
+- Running in production
+- Ignore .env, credentials and the crypto store
+- Ship the Matrix icon, drop deployment-specific values from the repo
+
 ## 0.7.0 - 5.9.2026
 
 - Copy existing thread history onto the issue on link

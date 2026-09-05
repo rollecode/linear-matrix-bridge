@@ -1,6 +1,12 @@
 node_modules/
 .wrangler/
-.dev.vars
 dist/
 *.log
 worker-configuration.d.ts
+
+# Deployment secrets and state. The crypto store holds megolm keys: committing
+# it would hand over the ability to decrypt every bridged room.
+.env
+.dev.vars
+.bot-password
+data/

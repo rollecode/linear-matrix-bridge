@@ -4,10 +4,10 @@
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name linear.chat.mementomori.social;
+    server_name linear.example.org;
 
-    ssl_certificate /etc/letsencrypt/live/linear.chat.mementomori.social/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/linear.chat.mementomori.social/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/linear.example.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/linear.example.org/privkey.pem;
 
     add_header Strict-Transport-Security max-age=15768000;
 
@@ -42,7 +42,7 @@ server {
 server {
     listen 80;
     listen [::]:80;
-    server_name linear.chat.mementomori.social;
+    server_name linear.example.org;
 
     location /.well-known/acme-challenge/ {
         root /var/www/html;

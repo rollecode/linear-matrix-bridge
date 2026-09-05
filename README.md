@@ -6,7 +6,7 @@
 <img style="justify-content:center;text-align: center;width: 180px; height: auto;"  width="1600" height="400" alt="Linear" src="https://github.com/user-attachments/assets/8c2d5756-0e3f-432a-8a3d-1d0e8293539a" /> &nbsp; <img style="justify-content:center;text-align: center;width: 100px; height: auto;" width="1920" height="820" alt="Matrix" src="https://github.com/user-attachments/assets/8685c940-eb6d-4417-8300-6979c0ce3821" />
 
 
-![Version](https://img.shields.io/badge/version-0.7.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
 
 </div>
 </center>
@@ -76,7 +76,7 @@ Set the non-secret values in the `vars` block of `wrangler.jsonc`:
 | `LINEAR_AUTH_MODE` | `oauth` or `api_key`. See below. |
 | `COMMAND_PREFIX` | Defaults to `!linear`. |
 | `MATRIX_HOMESERVER_NAME` | Subtitle on the Linear attachment. Falls back to the room ID. |
-| `MATRIX_ICON_URL` | Publicly reachable icon for that attachment. |
+| `MATRIX_ICON_URL` | Publicly reachable icon for that attachment. `public/matrix-icon.png` ships with the repo and the example vhost serves it. |
 
 Then the four secrets, which never belong in `wrangler.jsonc`:
 
@@ -131,6 +131,8 @@ Configuration comes from the environment rather than `wrangler.jsonc`. Put the f
 MATRIX_HOMESERVER_URL=https://matrix.example.org
 MATRIX_BOT_USER_ID=@linear:example.org
 MATRIX_ALLOWED_ROOMS=
+MATRIX_HOMESERVER_NAME=example.org
+MATRIX_ICON_URL=https://linear.example.org/matrix-icon.png
 LINEAR_TEAM_ID=
 LINEAR_AUTH_MODE=api_key
 MATRIX_AS_TOKEN=
@@ -144,6 +146,7 @@ Then install the unit and start it:
 
 ```sh
 sudo cp deploy/linear-matrix-bridge.service /etc/systemd/system/
+# Set User/Group and point ExecStart at a Node 24+ binary for this host first.
 sudo systemctl daemon-reload
 sudo systemctl enable --now linear-matrix-bridge
 curl -s http://127.0.0.1:5055/health

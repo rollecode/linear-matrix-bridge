@@ -5,13 +5,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=rolle
-Group=rolle
+User=linearbridge
+Group=linearbridge
 WorkingDirectory=/opt/linear-matrix-bridge
 
-# The Rust crypto SDK needs Node 24 or newer, so the nvm build is pinned rather
-# than /usr/bin/node. Update this path if the nvm version changes.
-ExecStart=/home/rolle/.nvm/versions/node/v24.20.0/bin/node dist/server/index.js
+# The Rust crypto SDK needs Node 24 or newer. Point this at whichever build
+# provides it; a version manager's path must be absolute and pinned here.
+ExecStart=/usr/bin/node dist/server/index.js
 
 Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
@@ -20,8 +20,6 @@ Environment=DATABASE_PATH=/opt/linear-matrix-bridge/data/bridge.db
 Environment=MIGRATIONS_DIR=/opt/linear-matrix-bridge/migrations
 Environment=BOT_STORAGE_PATH=/opt/linear-matrix-bridge/data/bot.json
 Environment=CRYPTO_STORAGE_PATH=/opt/linear-matrix-bridge/data/crypto
-Environment=MATRIX_HOMESERVER_NAME=chat.mementomori.social
-Environment=MATRIX_ICON_URL=https://linear.chat.mementomori.social/matrix-icon.png
 
 # Tokens live here, mode 600, never in the unit and never in git.
 EnvironmentFile=/opt/linear-matrix-bridge/.env
