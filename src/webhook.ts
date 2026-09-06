@@ -27,7 +27,13 @@ interface CommentData {
 interface IssueData {
   id: string;
   identifier?: string;
+  url?: string;
   state?: { name?: string };
+}
+
+/** The webhook already carries the URL, so the identifier links without inventing one. */
+function linked(identifier: string, url?: string): string {
+  return url ? `[${identifier}](${url})` : identifier;
 }
 
 /** Verified against the raw body: re-stringifying parsed JSON changes the bytes and breaks the HMAC. */
@@ -80,7 +86,7 @@ async function handleCommentCreated(env: Env, payload: LinearWebhookPayload, mat
   const author = comment.user?.name ?? payload.actor?.name ?? "Linear";
 
   for (const link of links) {
-    await postToThread(env, matrix, link, `**${author}** posted on Linear (${link.linear_issue_identifier}):\n\n${comment.body}`);
+    await postToThread(env, matrix, link, `**${author}** posted on Linear (${linked(link.linear_issue_identifier, payload.url)}):\n\n${comment.body}`);
   }
 }
 
@@ -96,7 +102,7 @@ async function handleIssueStateChange(env: Env, payload: LinearWebhookPayload, m
   }
 
   for (const link of await findLinksByIssue(env.DB, issue.id)) {
-    await postToThread(env, matrix, link, `${link.linear_issue_identifier} moved to **${stateName}**`);
+    await postToThread(env, matrix, link, `${linked(link.linear_issue_identifier, issue.url)} moved to **${stateName}**`);
   }
 }
 

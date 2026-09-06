@@ -21,6 +21,7 @@ function commentPayload(id = COMMENT_ID) {
     type: "Comment",
     webhookTimestamp: Date.now(),
     actor: { name: "Robin" },
+    url: "https://linear.app/test/issue/MEM-42/thing#comment-1",
     data: { id, body: "Looks good to me", issueId: ISSUE_ID, user: { name: "Robin" } },
   };
 }
@@ -65,7 +66,9 @@ describe("Linear webhook", () => {
     expect(fetchStub.matrixSends).toHaveLength(1);
 
     const content = fetchStub.matrixSends[0]!.body as { body: string };
-    expect(content.body).toContain("**Robin** posted on Linear (MEM-42)");
+    expect(content.body).toContain(
+      "**Robin** posted on Linear ([MEM-42](https://linear.app/test/issue/MEM-42/thing#comment-1))",
+    );
     expect(content.body).toContain("Looks good to me");
   });
 
@@ -93,7 +96,12 @@ describe("Linear webhook", () => {
       type: "Issue",
       webhookTimestamp: Date.now(),
       updatedFrom: { stateId: "old-state" },
-      data: { id: ISSUE_ID, identifier: ISSUE_IDENTIFIER, state: { name: "In Progress" } },
+      data: {
+        id: ISSUE_ID,
+        identifier: ISSUE_IDENTIFIER,
+        url: "https://linear.app/test/issue/MEM-42/thing",
+        state: { name: "In Progress" },
+      },
     };
     const titleChange = {
       action: "update",
@@ -107,7 +115,9 @@ describe("Linear webhook", () => {
     await SELF.fetch(await signedWebhookRequest(titleChange));
 
     expect(fetchStub.matrixSends).toHaveLength(1);
-    expect((fetchStub.matrixSends[0]!.body as { body: string }).body).toContain("In Progress");
+    const stateBody = (fetchStub.matrixSends[0]!.body as { body: string }).body;
+    expect(stateBody).toContain("In Progress");
+    expect(stateBody).toContain("[MEM-42](https://linear.app/test/issue/MEM-42/thing)");
   });
 
   it("fans a comment out to every thread linked to the issue", async () => {

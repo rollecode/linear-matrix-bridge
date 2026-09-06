@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## 1.2.3 - 6.9.2026
+
+- Link the issue identifier on bridged messages
+
 ## 1.2.2 - 6.9.2026
 
 - Show title and link for other candidates
