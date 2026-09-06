@@ -334,7 +334,8 @@ describe("Matrix appservice transactions", () => {
       .bind("$nl-1")
       .first<{ linear_issue_identifier: string }>();
     expect(link?.linear_issue_identifier).toBe(ISSUE_IDENTIFIER);
-    expect((fetchStub.matrixSends[0]!.body as { body: string }).body).toContain("MEM-99");
+    const posted = (fetchStub.matrixSends[0]!.body as { body: string }).body;
+    expect(posted).toContain("- [MEM-99 Something else](https://linear.app/test/issue/MEM-99)");
   });
 
   it("moves the link when a different issue is named", async () => {

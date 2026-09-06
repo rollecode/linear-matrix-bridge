@@ -290,7 +290,10 @@ async function suggestAndLink(bridge: Bridge, event: MatrixEvent, anchor: string
 
   const { note } = await establishLink(bridge, event, anchor, best);
 
-  const alternatives = rest.length > 0 ? `\n\nOther candidates: ${rest.map((i) => i.identifier).join(", ")}.` : "";
+  const alternatives =
+    rest.length > 0
+      ? `\n\nOther candidates:\n${rest.map((issue) => `- [${issue.identifier} ${issue.title}](${issue.url})`).join("\n")}`
+      : "";
   await reply(
     bridge,
     event.room_id,

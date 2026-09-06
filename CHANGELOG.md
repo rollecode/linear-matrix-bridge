@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## 1.2.2 - 6.9.2026
+
+- Show title and link for other candidates
+
 ## 1.2.1 - 5.9.2026
 
 - Name the author and origin on bridged messages
