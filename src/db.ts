@@ -25,11 +25,14 @@ export async function releaseTransaction(db: BridgeDatabase, txnId: string): Pro
   await db.prepare("DELETE FROM processed_transactions WHERE txn_id = ?").bind(txnId).run();
 }
 
-export async function findLinkByThread(db: BridgeDatabase, roomId: string, threadRootEventId: string): Promise<Link | null> {
-  return db
-    .prepare("SELECT * FROM links WHERE matrix_room_id = ? AND thread_root_event_id = ?")
+/** A thread can back several issues, so every caller handles a list. */
+export async function findLinksByThread(db: BridgeDatabase, roomId: string, threadRootEventId: string): Promise<Link[]> {
+  const rows = await db
+    .prepare("SELECT * FROM links WHERE matrix_room_id = ? AND thread_root_event_id = ? ORDER BY created_at")
     .bind(roomId, threadRootEventId)
-    .first<Link>();
+    .all<Link>();
+
+  return rows.results;
 }
 
 /** One issue can back several threads, so Linear-side events fan out to all of them. */
@@ -65,24 +68,36 @@ export async function createLink(
   return result.meta.changes > 0;
 }
 
-export async function deleteLink(db: BridgeDatabase, roomId: string, threadRootEventId: string): Promise<boolean> {
-  const result = await db
-    .prepare("DELETE FROM links WHERE matrix_room_id = ? AND thread_root_event_id = ?")
-    .bind(roomId, threadRootEventId)
-    .run();
+/** Without an issue id this drops every issue linked to the thread. */
+export async function deleteLink(
+  db: BridgeDatabase,
+  roomId: string,
+  threadRootEventId: string,
+  linearIssueId?: string,
+): Promise<number> {
+  const sql = linearIssueId
+    ? "DELETE FROM links WHERE matrix_room_id = ? AND thread_root_event_id = ? AND linear_issue_id = ?"
+    : "DELETE FROM links WHERE matrix_room_id = ? AND thread_root_event_id = ?";
+  const binds = linearIssueId ? [roomId, threadRootEventId, linearIssueId] : [roomId, threadRootEventId];
 
-  return result.meta.changes > 0;
+  const result = await db.prepare(sql).bind(...binds).run();
+
+  return result.meta.changes;
 }
 
 /** The Linear comment every later bridged comment nests under, so one Matrix thread is one Linear thread. */
 export async function setLinearParentComment(
   db: BridgeDatabase,
   threadRootEventId: string,
+  linearIssueId: string,
   commentId: string,
 ): Promise<void> {
   await db
-    .prepare("UPDATE links SET linear_parent_comment_id = ? WHERE thread_root_event_id = ? AND linear_parent_comment_id IS NULL")
-    .bind(commentId, threadRootEventId)
+    .prepare(
+      `UPDATE links SET linear_parent_comment_id = ?
+       WHERE thread_root_event_id = ? AND linear_issue_id = ? AND linear_parent_comment_id IS NULL`,
+    )
+    .bind(commentId, threadRootEventId, linearIssueId)
     .run();
 }
 

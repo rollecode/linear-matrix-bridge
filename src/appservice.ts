@@ -11,7 +11,8 @@ import {
 import {
   createLink,
   deleteLink,
-  findLinkByThread,
+  findLinksByThread,
+  type Link,
   isSentEvent,
   recordSentComment,
   recordSentEvent,
@@ -132,8 +133,8 @@ async function handleMessage(bridge: Bridge, event: MatrixEvent): Promise<void> 
     return;
   }
 
-  const link = await findLinkByThread(bridge.env.DB, event.room_id, threadRootEventId);
-  if (!link) {
+  const links = await findLinksByThread(bridge.env.DB, event.room_id, threadRootEventId);
+  if (links.length === 0) {
     return;
   }
 
@@ -145,23 +146,26 @@ async function handleMessage(bridge: Bridge, event: MatrixEvent): Promise<void> 
   const authorName = await bridge.matrix.getDisplayName(event.sender);
   const commentBody = bridge.linear.attributesToApp ? text : `**${authorName}** posted on Matrix:\n\n${text}`;
 
-  const commentId = await bridge.linear.createComment(
-    link.linear_issue_id,
-    commentBody,
-    authorName,
-    link.linear_parent_comment_id,
-  );
+  for (const link of links) {
+    const commentId = await bridge.linear.createComment(
+      link.linear_issue_id,
+      commentBody,
+      authorName,
+      link.linear_parent_comment_id,
+    );
 
-  console.log(`Bridged a message from ${event.sender} to ${link.linear_issue_identifier} as comment ${commentId}`);
+    console.log(`Bridged a message from ${event.sender} to ${link.linear_issue_identifier} as comment ${commentId}`);
 
-  // Linear will webhook this comment straight back at us; remember it so we drop it.
-  await recordSentComment(bridge.env.DB, commentId);
+    // Linear will webhook this comment straight back at us; remember it so we drop it.
+    await recordSentComment(bridge.env.DB, commentId);
 
-  // The first one opens the Linear comment thread that the rest nest under.
-  if (!link.linear_parent_comment_id) {
-    await setLinearParentComment(bridge.env.DB, link.thread_root_event_id, commentId);
+    // The first one opens the Linear comment thread that the rest nest under.
+    if (!link.linear_parent_comment_id) {
+      await setLinearParentComment(bridge.env.DB, link.thread_root_event_id, link.linear_issue_id, commentId);
+    }
   }
-  await setLastEvent(bridge.env.DB, link.thread_root_event_id, event.event_id);
+
+  await setLastEvent(bridge.env.DB, threadRootEventId, event.event_id);
 }
 
 /**
@@ -172,41 +176,31 @@ async function handleMessage(bridge: Bridge, event: MatrixEvent): Promise<void> 
 async function handleMention(bridge: Bridge, event: MatrixEvent, body: string): Promise<void> {
   const text = withoutMention(body, bridge.env.MATRIX_BOT_USER_ID, bridge.env.MATRIX_BOT_NAME ?? "");
   const anchor = threadRootOf(event.content["m.relates_to"]) ?? event.event_id;
-  const existing = await findLinkByThread(bridge.env.DB, event.room_id, anchor);
+  const existing = await findLinksByThread(bridge.env.DB, event.room_id, anchor);
   console.log(`Mention from ${event.sender} in ${event.room_id}: ${text}`);
+  const named = issueIdentifierIn(text);
 
-  if (looksLikeUnlink(text) && existing) {
-    await deleteLink(bridge.env.DB, event.room_id, anchor);
-    const named = issueIdentifierIn(text);
-
-    if (named && named !== existing.linear_issue_identifier) {
-      await relink(bridge, event, anchor, named);
-      return;
-    }
-
-    await reply(bridge, event.room_id, anchor, `Unlinked from ${existing.linear_issue_identifier}.`);
+  if (looksLikeUnlink(text) && existing.length > 0) {
+    await unlinkFromThread(bridge, event, anchor, existing, named);
     return;
   }
 
-  const named = issueIdentifierIn(text);
   if (named) {
-    if (existing?.linear_issue_identifier === named) {
+    if (existing.some((link) => link.linear_issue_identifier === named)) {
       await reply(bridge, event.room_id, anchor, `Already linked to ${named}.`);
       return;
-    }
-    if (existing) {
-      await deleteLink(bridge.env.DB, event.room_id, anchor);
     }
     await relink(bridge, event, anchor, named);
     return;
   }
 
-  if (existing) {
+  if (existing.length > 0) {
+    const names = existing.map((link) => link.linear_issue_identifier).join(", ");
     await reply(
       bridge,
       event.room_id,
       anchor,
-      `This thread is linked to ${existing.linear_issue_identifier}. Name another issue to move it, or say unlink.`,
+      `This thread is linked to ${names}. Name another issue to add it, or say unlink.`,
     );
     return;
   }
@@ -245,6 +239,27 @@ async function establishLink(
 
   console.log(`Linked ${issue.identifier} to thread ${anchor} in ${event.room_id}`);
   return { linked: true, note: backfillNote(carried) };
+}
+
+/** A named issue drops just that one; otherwise the thread is detached from all of them. */
+async function unlinkFromThread(
+  bridge: Bridge,
+  event: MatrixEvent,
+  anchor: string,
+  existing: Link[],
+  named: string | undefined,
+): Promise<void> {
+  const target = named ? existing.find((link) => link.linear_issue_identifier === named) : undefined;
+
+  if (named && !target) {
+    await relink(bridge, event, anchor, named);
+    return;
+  }
+
+  await deleteLink(bridge.env.DB, event.room_id, anchor, target?.linear_issue_id);
+  const removed = target ? target.linear_issue_identifier : existing.map((l) => l.linear_issue_identifier).join(", ");
+
+  await reply(bridge, event.room_id, anchor, `Unlinked from ${removed}.`);
 }
 
 async function relink(bridge: Bridge, event: MatrixEvent, anchor: string, identifier: string): Promise<void> {
@@ -342,9 +357,12 @@ async function handleCommand(bridge: Bridge, event: MatrixEvent, rest: string): 
   const threadRootEventId = threadRootOf(relatesTo);
 
   if (threadRootEventId) {
-    const existing = await findLinkByThread(bridge.env.DB, event.room_id, threadRootEventId);
-    if (existing) {
-      await reply(bridge, event.room_id, threadRootEventId, `This thread is already linked to ${existing.linear_issue_identifier}.`);
+    const existing = await findLinksByThread(bridge.env.DB, event.room_id, threadRootEventId);
+    const named = issueIdentifierIn(rest);
+
+    if (existing.length > 0 && !named) {
+      const names = existing.map((link) => link.linear_issue_identifier).join(", ");
+      await reply(bridge, event.room_id, threadRootEventId, `This thread is linked to ${names}. Name an issue to add another.`);
       return;
     }
   }
@@ -379,7 +397,7 @@ async function linkExistingIssue(
   const { linked, note } = await establishLink(bridge, event, anchor, issue);
 
   if (!linked) {
-    await reply(bridge, event.room_id, anchor, `This thread is already linked to an issue.`);
+    await reply(bridge, event.room_id, anchor, `This thread is already linked to ${issue.identifier}.`);
     return;
   }
 
@@ -458,7 +476,7 @@ async function backfillThread(
   }
 
   if (parentId) {
-    await setLinearParentComment(bridge.env.DB, threadRootEventId, parentId);
+    await setLinearParentComment(bridge.env.DB, threadRootEventId, issueId, parentId);
   }
 
   console.log(`Backfilled ${bridged} messages into ${identifier}, ${history.unreadable} unreadable`);
@@ -510,7 +528,7 @@ async function createIssueFromCommand(
 }
 
 async function reply(bridge: Bridge, roomId: string, threadRootEventId: string, markdown: string): Promise<void> {
-  const link = await findLinkByThread(bridge.env.DB, roomId, threadRootEventId);
+  const [link] = await findLinksByThread(bridge.env.DB, roomId, threadRootEventId);
   const latest = link?.last_event_id ?? threadRootEventId;
 
   const eventId = await bridge.matrix.sendThreadMessage(roomId, threadRootEventId, latest, markdown);

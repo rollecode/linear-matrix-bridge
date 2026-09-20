@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 1.3.0 - 20.9.2026
+
+- Link one thread to several issues
+- Unlink one named issue or all of them
+
 ## 1.2.3 - 6.9.2026
 
 - Link the issue identifier on bridged messages

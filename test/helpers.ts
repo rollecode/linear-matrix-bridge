@@ -80,7 +80,12 @@ export function stubFetch(): FetchStub {
 
       if (url.includes("api.linear.app")) {
         stub.linearCalls.push(recorded);
-        return Response.json({ data: linearResponse(String((body as { query?: string })?.query ?? "")) });
+        return Response.json({
+          data: linearResponse(
+            String((body as { query?: string })?.query ?? ""),
+            (body as { variables?: Record<string, unknown> })?.variables ?? {},
+          ),
+        });
       }
 
       return Response.json({});
@@ -92,7 +97,7 @@ export function stubFetch(): FetchStub {
 
 let commentCounter = 0;
 
-function linearResponse(query: string): unknown {
+function linearResponse(query: string, variables: Record<string, unknown>): unknown {
   if (query.includes("issueCreate")) {
     return {
       issueCreate: {
@@ -127,16 +132,13 @@ function linearResponse(query: string): unknown {
     return { attachmentCreate: { success: true, attachment: { id: "attachment-uuid" } } };
   }
 
+  // Echo back the identifier that was asked for, so tests can tell issues apart.
+  const identifier = `${variables.teamKey ?? "MEM"}-${variables.number ?? 42}`;
+  const id = identifier === ISSUE_IDENTIFIER ? ISSUE_ID : `id-${identifier}`;
+
   return {
     issues: {
-      nodes: [
-        {
-          id: ISSUE_ID,
-          identifier: ISSUE_IDENTIFIER,
-          title: "Fix the login bug",
-          url: `https://linear.app/test/issue/${ISSUE_IDENTIFIER}`,
-        },
-      ],
+      nodes: [{ id, identifier, title: "Fix the login bug", url: `https://linear.app/test/issue/${identifier}` }],
     },
   };
 }
@@ -155,13 +157,15 @@ export async function seedLink(
   lastEventId: string | null = null,
   threadRoot: string = THREAD_ROOT,
   roomId: string = ROOM_ID,
+  issueId: string = ISSUE_ID,
+  issueIdentifier: string = ISSUE_IDENTIFIER,
 ): Promise<void> {
   await env.DB.prepare(
     `INSERT INTO links
      (matrix_room_id, thread_root_event_id, linear_issue_id, linear_issue_identifier, last_event_id, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
   )
-    .bind(roomId, threadRoot, ISSUE_ID, ISSUE_IDENTIFIER, lastEventId, Date.now())
+    .bind(roomId, threadRoot, issueId, issueIdentifier, lastEventId, Date.now())
     .run();
 }
 

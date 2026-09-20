@@ -6,7 +6,7 @@
 <img style="justify-content:center;text-align: center;width: 180px; height: auto;"  width="1600" height="400" alt="Linear" src="https://github.com/user-attachments/assets/8c2d5756-0e3f-432a-8a3d-1d0e8293539a" /> &nbsp; <img style="justify-content:center;text-align: center;width: 100px; height: auto;" width="1920" height="820" alt="Matrix" src="https://github.com/user-attachments/assets/8685c940-eb6d-4417-8300-6979c0ce3821" />
 
 
-![Version](https://img.shields.io/badge/version-1.2.3-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
+![Version](https://img.shields.io/badge/version-1.3.0-blue.svg?style=for-the-badge) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white) ![Matrix](https://img.shields.io/badge/Matrix-000000?style=for-the-badge&logo=matrix&logoColor=white)
 
 </div>
 </center>
@@ -30,11 +30,11 @@ A Matrix thread and a Linear issue become one conversation. Replies in the threa
 | In Matrix | What happens |
 | --- | --- |
 | Mention the bot: "can you link this to the right task?" | Searches Linear for the issue this thread is about, links it, copies the conversation so far onto it, and says which one it picked. |
-| Mention it with an identifier, or say it picked wrong | Moves the link, or removes it. |
+| Mention it with an identifier, or say it picked wrong | Adds that issue, or unlinks. Naming an issue with unlink drops only that one; without a name it drops them all. |
 | `!linear Fix the login bug` | Creates an issue in the configured team. The bot replies in a thread with the identifier and URL, and that thread is now mapped to the issue. |
 | `!linear` as a reply to a message | Uses the replied-to message as the description and as the thread anchor. Without a title, the first line of that message becomes the title. |
-| `!linear link MEM-42` | Maps the current thread to an issue that already exists, and copies what was already said in it onto the issue. Several threads, in different rooms, can point at the same issue. |
-| Any message in a mapped thread | Becomes a comment on the issue, nested under the first one so the Matrix thread stays one Linear comment thread. |
+| `!linear link MEM-42` | Maps the current thread to an issue that already exists, and copies what was already said in it onto the issue. A thread can be linked to several issues, and an issue to several threads. |
+| Any message in a mapped thread | Becomes a comment on every issue the thread is linked to, nested under the first one so the Matrix thread stays one Linear comment thread per issue. |
 | Being invited to a room | The bot joins, as long as the room passes `MATRIX_ALLOWED_ROOMS`. In an encrypted room it says it cannot read anything there. |
 
 | In Linear | What happens |

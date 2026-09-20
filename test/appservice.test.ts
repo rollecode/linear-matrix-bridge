@@ -521,6 +521,57 @@ describe("Matrix appservice transactions", () => {
     expect(bodies.join()).not.toContain("link this to the right task");
   });
 
+  it("comments on every issue the thread is linked to", async () => {
+    await seedLink();
+    await seedLink(null, THREAD_ROOT, ROOM_ID, "second-id", "MEM-77");
+
+    await SELF.fetch(transactionRequest("txn-multi", [threadedMessage("$m-multi", "both should hear this")]));
+
+    const issues = fetchStub.linearCalls
+      .filter((c) => String((c.body as { query: string }).query).includes("commentCreate"))
+      .map((c) => (c.body as { variables: { input: { issueId: string } } }).variables.input.issueId);
+
+    expect(issues.sort()).toEqual([ISSUE_ID, "second-id"].sort());
+  });
+
+  it("adds a second issue instead of refusing", async () => {
+    await seedLink();
+
+    await SELF.fetch(transactionRequest("txn-add", [mentionMessage("$add", "also MEM-77", THREAD_ROOT)]));
+
+    const rows = await testEnv.DB.prepare("SELECT linear_issue_identifier FROM links WHERE thread_root_event_id = ?")
+      .bind(THREAD_ROOT)
+      .all<{ linear_issue_identifier: string }>();
+
+    expect(rows.results.map((r) => r.linear_issue_identifier).sort()).toEqual([ISSUE_IDENTIFIER, "MEM-77"].sort());
+  });
+
+  it("unlinks only the issue named, leaving the rest", async () => {
+    await seedLink();
+    await seedLink(null, THREAD_ROOT, ROOM_ID, "second-id", "MEM-77");
+
+    await SELF.fetch(transactionRequest("txn-un1", [mentionMessage("$un1", "unlink MEM-77", THREAD_ROOT)]));
+
+    const rows = await testEnv.DB.prepare("SELECT linear_issue_identifier FROM links WHERE thread_root_event_id = ?")
+      .bind(THREAD_ROOT)
+      .all<{ linear_issue_identifier: string }>();
+
+    expect(rows.results.map((r) => r.linear_issue_identifier)).toEqual([ISSUE_IDENTIFIER]);
+  });
+
+  it("unlinks everything when no issue is named", async () => {
+    await seedLink();
+    await seedLink(null, THREAD_ROOT, ROOM_ID, "second-id", "MEM-77");
+
+    await SELF.fetch(transactionRequest("txn-unall", [mentionMessage("$unall", "unlink this thread", THREAD_ROOT)]));
+
+    const rows = await testEnv.DB.prepare("SELECT linear_issue_identifier FROM links WHERE thread_root_event_id = ?")
+      .bind(THREAD_ROOT)
+      .all<{ linear_issue_identifier: string }>();
+
+    expect(rows.results).toHaveLength(0);
+  });
+
   it("links an existing issue to the current thread", async () => {
     const command = {
       type: "m.room.message",
