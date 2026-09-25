@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## 1.4.0 - 25.9.2026
+
+- Post to Linear as an OAuth app
+
 ## 1.3.0 - 20.9.2026
 
 - Link one thread to several issues
