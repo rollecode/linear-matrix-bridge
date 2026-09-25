@@ -510,7 +510,8 @@ async function createIssueFromCommand(
     return;
   }
 
-  const issue = await bridge.linear.createIssue(bridge.env.LINEAR_TEAM_ID, resolvedTitle, description);
+  const authorName = await bridge.matrix.getDisplayName(event.sender);
+  const issue = await bridge.linear.createIssue(bridge.env.LINEAR_TEAM_ID, resolvedTitle, description, authorName);
 
   const linked = await createLink(bridge.env.DB, {
     matrix_room_id: event.room_id,

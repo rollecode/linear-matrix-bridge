@@ -24,6 +24,11 @@ export const MAX_EVENTS_PER_TRANSACTION = 40;
 export const WEBHOOK_MAX_CLOCK_SKEW_MS = 60_000;
 
 export const LINEAR_API_URL = "https://api.linear.app/graphql";
+export const LINEAR_TOKEN_URL = "https://api.linear.app/oauth/token";
+export const LINEAR_APP_SCOPES = "read,write";
+/** Refresh an app token this long before Linear says it expires. */
+export const TOKEN_REFRESH_MARGIN_MS = 3_600_000;
+export const HTTP_UNAUTHORIZED_STATUS = 401;
 
 /** Cap on messages pulled into Linear when an existing thread is linked. */
 export const MAX_BACKFILL_MESSAGES = 50;

@@ -75,7 +75,8 @@ Set the non-secret values in the `vars` block of `wrangler.jsonc`:
 | `MATRIX_BOT_USER_ID` | Full MXID built from `sender_localpart`, for example `@linear:example.org`. |
 | `MATRIX_ALLOWED_ROOMS` | Comma-separated room IDs the bridge acts in. Empty means every room it is invited to. |
 | `LINEAR_TEAM_ID` | UUID of the team that `!linear <title>` creates issues in. |
-| `LINEAR_AUTH_MODE` | `oauth` or `api_key`. See below. |
+| `LINEAR_AUTH_MODE` | `oauth` or `api_key`. See below. Ignored when client credentials are set. |
+| `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET` | Optional. Post as an OAuth application instead of as the owner of `LINEAR_TOKEN`. |
 | `COMMAND_PREFIX` | Defaults to `!linear`. |
 | `GEMINI_API_KEY` | Optional. Condenses a thread into a search phrase. Without it the raw thread text is searched. |
 | `GEMINI_MODEL` | Defaults to `gemini-3.6-flash`. |
@@ -115,7 +116,8 @@ Create the webhook in Linear's API settings pointing at `https://<your-worker>/l
 
 For `LINEAR_TOKEN` there are two options:
 
-- **OAuth application with `actor=app`** (preferred). Comments and issues are attributed to the bridge itself, and the Matrix sender's name rides along in Linear's `createAsUser` field, so each comment shows the person who actually wrote it. Set `LINEAR_AUTH_MODE` to `oauth` and use the access token.
+- **OAuth application with client credentials** (preferred). Create an OAuth application in Linear's API settings, name it what the bot should appear as, and turn on client credentials tokens. Put its id and secret in `LINEAR_CLIENT_ID` and `LINEAR_CLIENT_SECRET`, and leave `LINEAR_TOKEN` empty. The bridge requests its own app token, reuses it until shortly before it expires, and asks for a new one if Linear rejects it. Comments and issues then appear as the application, with the Matrix sender's name attached through `createAsUser`.
+- **OAuth application with `actor=app`**, using a token you obtained yourself. Comments and issues are attributed to the bridge itself, and the Matrix sender's name rides along in Linear's `createAsUser` field, so each comment shows the person who actually wrote it. Set `LINEAR_AUTH_MODE` to `oauth` and use the access token.
 - **Personal API key** as a fallback. Set `LINEAR_AUTH_MODE` to `api_key`. Linear then attributes **every bridged comment and issue to the person who owns that key**, and the Matrix sender's name is written into the comment body instead.
 
 ## Running on your own server instead

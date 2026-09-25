@@ -54,7 +54,9 @@ function buildEnv(db: SqliteD1): Env {
     BOT_STORAGE_PATH: process.env.BOT_STORAGE_PATH,
     CRYPTO_STORAGE_PATH: process.env.CRYPTO_STORAGE_PATH,
     MATRIX_HS_TOKEN: required("MATRIX_HS_TOKEN"),
-    LINEAR_TOKEN: required("LINEAR_TOKEN"),
+    LINEAR_TOKEN: process.env.LINEAR_TOKEN,
+    LINEAR_CLIENT_ID: process.env.LINEAR_CLIENT_ID,
+    LINEAR_CLIENT_SECRET: process.env.LINEAR_CLIENT_SECRET,
     LINEAR_WEBHOOK_SECRET: required("LINEAR_WEBHOOK_SECRET"),
   };
 }

@@ -1,4 +1,10 @@
-import { LINEAR_API_URL } from "./constants.js";
+import {
+  HTTP_UNAUTHORIZED_STATUS,
+  LINEAR_API_URL,
+  LINEAR_APP_SCOPES,
+  LINEAR_TOKEN_URL,
+  TOKEN_REFRESH_MARGIN_MS,
+} from "./constants.js";
 import type { Env } from "./env.js";
 
 export interface LinearIssue {
@@ -37,31 +43,79 @@ const FIND_ISSUE = `query FindIssue($teamKey: String!, $number: Float!) {
   }
 }`;
 
+// Shared across clients: a new LinearClient is built per event, the token outlives them.
+let appToken: { value: string; expiresAt: number } | null = null;
+
 export class LinearClient {
   private readonly url: string;
   private readonly token: string;
+  private readonly clientId?: string;
+  private readonly clientSecret?: string;
   private readonly actsAsApp: boolean;
 
   constructor(env: Env) {
     this.url = env.LINEAR_API_URL ?? LINEAR_API_URL;
-    this.token = env.LINEAR_TOKEN;
-    this.actsAsApp = env.LINEAR_AUTH_MODE === "oauth";
+    this.token = env.LINEAR_TOKEN ?? "";
+    this.clientId = env.LINEAR_CLIENT_ID;
+    this.clientSecret = env.LINEAR_CLIENT_SECRET;
+    this.actsAsApp = this.usesClientCredentials() || env.LINEAR_AUTH_MODE === "oauth";
+  }
+
+  private usesClientCredentials(): boolean {
+    return Boolean(this.clientId && this.clientSecret);
+  }
+
+  private async appAccessToken(): Promise<string> {
+    if (appToken && appToken.expiresAt - TOKEN_REFRESH_MARGIN_MS > Date.now()) {
+      return appToken.value;
+    }
+
+    const response = await fetch(LINEAR_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "client_credentials",
+        scope: LINEAR_APP_SCOPES,
+        client_id: this.clientId!,
+        client_secret: this.clientSecret!,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new LinearError(`Linear token request returned ${response.status}: ${await response.text()}`);
+    }
+
+    const token = (await response.json()) as { access_token: string; expires_in: number };
+    appToken = { value: token.access_token, expiresAt: Date.now() + token.expires_in * 1000 };
+
+    return appToken.value;
   }
 
   /** Personal API keys go in bare; OAuth access tokens take the Bearer scheme. */
-  private authorization(): string {
+  private async authorization(): Promise<string> {
+    if (this.usesClientCredentials()) {
+      return `Bearer ${await this.appAccessToken()}`;
+    }
+
     return this.actsAsApp ? `Bearer ${this.token}` : this.token;
   }
 
-  private async graphql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-    const response = await fetch(this.url, {
+  private async post(query: string, variables: Record<string, unknown>): Promise<Response> {
+    return fetch(this.url, {
       method: "POST",
-      headers: {
-        Authorization: this.authorization(),
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: await this.authorization(), "Content-Type": "application/json" },
       body: JSON.stringify({ query, variables }),
     });
+  }
+
+  private async graphql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+    let response = await this.post(query, variables);
+
+    // A revoked or rotated app token: drop it and ask for a new one, once.
+    if (response.status === HTTP_UNAUTHORIZED_STATUS && this.usesClientCredentials()) {
+      appToken = null;
+      response = await this.post(query, variables);
+    }
 
     if (!response.ok) {
       throw new LinearError(`Linear API returned ${response.status}: ${await response.text()}`);
@@ -78,9 +132,14 @@ export class LinearClient {
     return payload.data;
   }
 
-  async createIssue(teamId: string, title: string, description?: string): Promise<LinearIssue> {
+  async createIssue(teamId: string, title: string, description?: string, authorName?: string): Promise<LinearIssue> {
+    const input: Record<string, unknown> = { teamId, title, description };
+    if (this.actsAsApp && authorName) {
+      input.createAsUser = authorName;
+    }
+
     const data = await this.graphql<{ issueCreate: { success: boolean; issue: LinearIssue | null } }>(CREATE_ISSUE, {
-      input: { teamId, title, description },
+      input,
     });
 
     if (!data.issueCreate.success || !data.issueCreate.issue) {

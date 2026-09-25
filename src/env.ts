@@ -31,6 +31,9 @@ export interface Env {
   LINEAR_TEAM_ID: string;
   LINEAR_AUTH_MODE: LinearAuthMode;
   LINEAR_API_URL?: string;
+  /** With both set, the bridge acts as a Linear app via client_credentials instead of LINEAR_TOKEN. */
+  LINEAR_CLIENT_ID?: string;
+  LINEAR_CLIENT_SECRET?: string;
 
   MATRIX_AS_TOKEN: string;
   /** Device access token for the bot user. Server deployment only; must stay stable or the crypto store is invalidated. */
@@ -38,7 +41,7 @@ export interface Env {
   BOT_STORAGE_PATH?: string;
   CRYPTO_STORAGE_PATH?: string;
   MATRIX_HS_TOKEN: string;
-  LINEAR_TOKEN: string;
+  LINEAR_TOKEN?: string;
   LINEAR_WEBHOOK_SECRET: string;
 }
 
